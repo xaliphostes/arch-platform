@@ -1,0 +1,48 @@
+fault:				fault.ts
+obs grid:			2D_grid.ts
+fractures:			fractures_MODEL_5.xyz
+
+E (Pa):				30e9
+nu:					0.25
+density (kg/m3):	2000
+friction angle (°)  30
+
+Remote:
+KH=SH/Sv=0.35		maximum horizontal stress ratio
+Kh=Sh/Sv=0.33		minimum horizontal stress ratio
+theta	=69°		orientation of SH from North to the East
+
+fractures:			joints
+
+
+***************************************
+******  MODEL 5a - WS gradient  *******
+***************************************
+Remote:				gradient
+Regime:				normal
+Sv:					9.81*2000*z
+space:				WS
+
+***************************************
+******  MODEL 5b - WS constant  *******
+***************************************
+Remote:				constant
+Regime:				normal
+Sv:					9.81*2000*500
+space:				WS
+
+***************************************
+******  MODEL 5c - HS gradient  *******
+***************************************
+Remote:				gradient
+Regime:				normal
+Sv:					9.81*2000*z
+space:				HS
+
+***************************************
+******  MODEL 5d - HS constant  *******
+***************************************
+Remote:				constant
+Regime:				normal
+Sv:					9.81*2000*500
+space:				HS
