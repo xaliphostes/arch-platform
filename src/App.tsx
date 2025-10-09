@@ -1,13 +1,6 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
-import * as keplerlit from 'keplerlit'
-
-// Declare keplerlit from window
-declare global {
-    interface Window {
-        keplerlit: any;
-    }
-}
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
+import * as K from 'keplerlit'
 
 type SurfaceType = 'wave' | 'sphere' | 'torus';
 type DisplayMode = 'filled' | 'lines' | 'both';
@@ -255,8 +248,8 @@ export default function App() {
 
     const generateContours = () => {
         if (!sceneRef.current || !geometryDataRef.current) return;
-        if (!window.keplerlit) {
-            console.warn('keplerlit library not loaded yet');
+        if (!K) {
+            console.warn('keplerlit library not available');
             return;
         }
 
@@ -276,10 +269,10 @@ export default function App() {
         const positions = geometry.attributes.position.array;
         const indices = geometry.index ? geometry.index.array : generateIndices(positions.length / 3);
 
-        const keplerPositions = new window.keplerlit.Float32BufferAttribute(Array.from(positions), 3);
-        const keplerIndices = new window.keplerlit.Uint32BufferAttribute(Array.from(indices), 1);
+        const keplerPositions = new K.Float32BufferAttribute(Array.from(positions), 3);
+        const keplerIndices = new K.Uint32BufferAttribute(Array.from(indices), 1);
 
-        const keplerGeometry = new window.keplerlit.BufferGeometry();
+        const keplerGeometry = new K.BufferGeometry();
         keplerGeometry.setPositions(keplerPositions);
         keplerGeometry.setIndices(keplerIndices);
 
@@ -294,7 +287,7 @@ export default function App() {
         try {
             // Generate filled contours
             if (displayMode === 'filled' || displayMode === 'both') {
-                const result = window.keplerlit.createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
+                const result = K.createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
                     colorTable: 'Rainbow',
                     nbColors: 512
                 });
@@ -329,7 +322,7 @@ export default function App() {
 
             // Generate line contours
             if (displayMode === 'lines' || displayMode === 'both') {
-                const result = window.keplerlit.createIsoContourLines(keplerGeometry, scalarField, isoList, "#000000", "Rainbow");
+                const result = K.createIsoContourLines(keplerGeometry, scalarField, isoList, "#000000", "Rainbow");
 
                 if (result.positions.length > 0) {
                     const lineGeometry = new THREE.BufferGeometry();
