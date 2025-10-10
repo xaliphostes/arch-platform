@@ -5,11 +5,7 @@ export default defineConfig({
     plugins: [react()],
     root: './',
     publicDir: 'public',
-    resolve: {
-        alias: {
-            keplerlit: 'keplerlit/dist/keplerlit.module.js'
-        }
-    },
+    base: '/arch-platform/', // must match your GitHub repo name
     optimizeDeps: {
         include: ['three', 'three/examples/jsm/controls/TrackballControls.js']
     },
