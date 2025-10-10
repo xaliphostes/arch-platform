@@ -1,6 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import * as K from 'keplerlit'
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js'
+import {
+    BufferGeometry, createIsoContourLines, createIsoContoursFilled,
+    Float32BufferAttribute, Uint32BufferAttribute
+} from './keplerlit';
 
 type SurfaceType = 'wave' | 'sphere' | 'torus';
 type DisplayMode = 'filled' | 'lines' | 'both';
@@ -10,6 +14,7 @@ export default function App() {
     const sceneRef = useRef<THREE.Scene | null>(null);
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+    const controlsRef = useRef<TrackballControls | null>(null);
     const animationIdRef = useRef<number | null>(null);
 
     // Mesh references
@@ -58,8 +63,15 @@ export default function App() {
         directionalLight.position.set(10, 10, 10);
         scene.add(directionalLight);
 
+        // Setup the Controls
+        const controls = new TrackballControls(camera, renderer.domElement);
+        // controls.enableDamping = true;
+        // controls.dampingFactor = 0.05;
+        controlsRef.current = controls;
+
         const animate = () => {
             animationIdRef.current = requestAnimationFrame(animate);
+            controls.update()
             renderer.render(scene, camera);
         };
         animate();
@@ -248,10 +260,6 @@ export default function App() {
 
     const generateContours = () => {
         if (!sceneRef.current || !geometryDataRef.current) return;
-        if (!K) {
-            console.warn('keplerlit library not available');
-            return;
-        }
 
         // Clear existing contour meshes
         if (contourMeshRef.current) {
@@ -269,10 +277,10 @@ export default function App() {
         const positions = geometry.attributes.position.array;
         const indices = geometry.index ? geometry.index.array : generateIndices(positions.length / 3);
 
-        const keplerPositions = new K.Float32BufferAttribute(Array.from(positions), 3);
-        const keplerIndices = new K.Uint32BufferAttribute(Array.from(indices), 1);
+        const keplerPositions = new Float32BufferAttribute(Array.from(positions), 3);
+        const keplerIndices = new Uint32BufferAttribute(Array.from(indices), 1);
 
-        const keplerGeometry = new K.BufferGeometry();
+        const keplerGeometry = new BufferGeometry();
         keplerGeometry.setPositions(keplerPositions);
         keplerGeometry.setIndices(keplerIndices);
 
@@ -287,8 +295,8 @@ export default function App() {
         try {
             // Generate filled contours
             if (displayMode === 'filled' || displayMode === 'both') {
-                const result = K.createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
-                    colorTable: 'Rainbow',
+                const result = createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
+                    //colorTable: 'Rainbow',
                     nbColors: 512
                 });
 
@@ -322,7 +330,7 @@ export default function App() {
 
             // Generate line contours
             if (displayMode === 'lines' || displayMode === 'both') {
-                const result = K.createIsoContourLines(keplerGeometry, scalarField, isoList, "#000000", "Rainbow");
+                const result = createIsoContourLines(keplerGeometry, scalarField, isoList, "#000000", "Rainbow");
 
                 if (result.positions.length > 0) {
                     const lineGeometry = new THREE.BufferGeometry();
@@ -402,8 +410,8 @@ export default function App() {
                                         key={type}
                                         onClick={() => setSurfaceType(type)}
                                         className={`w-full px-3 py-2 rounded text-sm ${surfaceType === type
-                                                ? 'bg-blue-600'
-                                                : 'bg-gray-700 hover:bg-gray-600'
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-700 hover:bg-gray-600'
                                             }`}
                                     >
                                         {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -421,8 +429,8 @@ export default function App() {
                                         key={mode}
                                         onClick={() => setDisplayMode(mode)}
                                         className={`w-full px-3 py-2 rounded text-sm ${displayMode === mode
-                                                ? 'bg-blue-600'
-                                                : 'bg-gray-700 hover:bg-gray-600'
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-700 hover:bg-gray-600'
                                             }`}
                                     >
                                         {mode.charAt(0).toUpperCase() + mode.slice(1)}
