@@ -24,17 +24,14 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
 
     return (
         <CollapsibleSubPanel title="Iso-Contours" isOpen={isOpen} onToggle={onToggle}>
-            <div className="control-group">
+            <div className="control-group horizontal">
                 <label>Attribute</label>
-                <select
-                    value={attribute}
-                    onChange={(e) => setAttribute(e.target.value)}
-                >
+                <select value={attribute} onChange={(e) => setAttribute(e.target.value)}>
                     <option value="filled">z</option>
                 </select>
             </div>
 
-            <div className="control-group">
+            <div className="control-group horizontal">
                 <label>Display Mode</label>
                 <select
                     value={displayMode}
@@ -46,8 +43,8 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
                 </select>
             </div>
 
-            <div className="control-group">
-                <label>Number of Contours: {numContours}</label>
+            <div className="control-group horizontal">
+                <label>Nb: {numContours}</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <input
                         type="range"
@@ -68,7 +65,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
                 </div>
             </div>
 
-            <div className="control-group">
+            <div className="control-group horizontal">
                 <label>Color Table</label>
                 <select
                     value={colorTable}

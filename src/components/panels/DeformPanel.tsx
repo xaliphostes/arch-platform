@@ -14,7 +14,7 @@ export const DeformPanel: React.FC<DeformPanelProps> = ({
 
     return (
         <CollapsibleSubPanel title="Deform" isOpen={isOpen} onToggle={onToggle}>
-            <div className="control-group">
+            <div className="control-group  horizontal">
                 <label>Scale: {deformScale}</label>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <input
