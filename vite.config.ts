@@ -11,7 +11,7 @@ export default defineConfig({
         }
     },
     optimizeDeps: {
-        include: ['keplerlit']
+        include: ['three', 'three/examples/jsm/controls/TrackballControls.js']
     },
     build: {
         outDir: 'dist'
