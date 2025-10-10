@@ -1,22 +1,28 @@
 import React, { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
 import { useScene } from '../contexts/SceneContext'
+
 import {
     BufferGeometry,
     createIsoContourLines,
     createIsoContoursFilled,
     Float32BufferAttribute,
-    Uint32BufferAttribute
+    Uint32BufferAttribute,
+    ColorScale
 } from '../keplerlit'
+
+import CameraControls from 'camera-controls'
+import { GradientBackground } from '../keplerlit/GradientBackground'
+import { createComplexGradient } from '../keplerlit/FixedImageBackground'
 
 export const ThreeScene = () => {
     const mountRef = useRef<HTMLDivElement>(null)
     const sceneRef = useRef<THREE.Scene | null>(null)
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-    const controlsRef = useRef<TrackballControls | null>(null)
+    const controlsRef = useRef<CameraControls | null>(null)
     const animationIdRef = useRef<number | null>(null)
+    const colorScaleRef = useRef<any | null>(null)
 
     // Mesh references
     const surfaceMeshRef = useRef<THREE.Mesh | null>(null)
@@ -28,9 +34,20 @@ export const ThreeScene = () => {
 
     const { displayMode, numContours, colorTable } = useScene()
 
+    const clock = new THREE.Clock()
+
     // Initialize Three.js scene
     useEffect(() => {
         if (!mountRef.current) return
+
+
+        CameraControls.install({ THREE: THREE })
+
+        // Clean up any existing ColorScale instances first
+        if (colorScaleRef.current) {
+            colorScaleRef.current.destroy()
+            colorScaleRef.current = null
+        }
 
         const scene = new THREE.Scene()
         scene.background = new THREE.Color(0xaaaaaa)
@@ -44,6 +61,7 @@ export const ThreeScene = () => {
         )
         camera.position.set(3, 3, 3)
         camera.lookAt(0, 0, 0)
+        camera.up.set( 0, 0, 1 );
         cameraRef.current = camera
 
         const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -58,18 +76,53 @@ export const ThreeScene = () => {
         directionalLight.position.set(10, 10, 10)
         scene.add(directionalLight)
 
-        // Setup TrackballControls
-        const controls = new TrackballControls(camera, renderer.domElement)
-        controls.rotateSpeed = 1.0
-        controls.zoomSpeed = 1.2
-        controls.panSpeed = 0.8
+        // Setup the controls
+        const controls = new CameraControls(camera, renderer.domElement);
+        controls.applyCameraUp()
         controlsRef.current = controls
+
+        //const gradient = new GradientBackground(scene, 'ocean')
+        const background = createComplexGradient(scene, 'grayscale')
+
+        // Initialize ColorScale
+        // const colorStops = [
+        //     { position: 0, color: '#0066cc' },
+        //     { position: 0.5, color: '#ffff00' },
+        //     { position: 1, color: '#cc0000' }
+        // ]
+
+        
+
+        colorScaleRef.current = new ColorScale({
+            canvas: renderer.domElement,
+            x: mountRef.current.clientWidth - 100,
+            y: 50,
+            width: 30,
+            height: 200,
+            min: 0,
+            max: 100,
+            attributeName: 'Scalar Value',
+            orientation: 'vertical',
+            //colorStops: colorStops,
+            colorMapName: 'Rainbow',
+            autoRender: false // Let React control rendering
+        })
 
         const animate = () => {
             animationIdRef.current = requestAnimationFrame(animate)
-            controls.update()
+
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+            const updated = controls.update(delta);
+
             renderer.render(scene, camera)
+
+            // Render ColorScale in animation loop
+            if (colorScaleRef.current) {
+                colorScaleRef.current.render()
+            }
         }
+
         animate()
 
         const handleResize = () => {
@@ -81,6 +134,15 @@ export const ThreeScene = () => {
             cameraRef.current.aspect = width / height
             cameraRef.current.updateProjectionMatrix()
             rendererRef.current.setSize(width, height)
+
+            // Update ColorScale position on resize
+            if (colorScaleRef.current) {
+                colorScaleRef.current.resize(width, height)
+                const x = width - 100
+                const y = 50
+                colorScaleRef.current.updatePosition(x, y)
+                colorScaleRef.current.updateSize(30, 200)
+            }
         }
         window.addEventListener('resize', handleResize)
 
@@ -94,6 +156,12 @@ export const ThreeScene = () => {
             }
             if (mountRef.current && renderer.domElement) {
                 mountRef.current.removeChild(renderer.domElement)
+            }
+            if (colorScaleRef.current) {
+                // Cleanup ColorScale if it has a dispose method
+                if (typeof colorScaleRef.current.dispose === 'function') {
+                    colorScaleRef.current.dispose()
+                }
             }
             controls.dispose()
             renderer.dispose()
@@ -168,13 +236,20 @@ export const ThreeScene = () => {
         geometryDataRef.current = { geometry, scalarField }
 
         const material = new THREE.MeshPhongMaterial({
-            color: 0x888888,
+            color: 0xffffff,
             transparent: false,
             opacity: 0.3
         })
         const mesh = new THREE.Mesh(geometry, material)
         surfaceMeshRef.current = mesh
         sceneRef.current.add(mesh)
+
+        // Update ColorScale range based on scalar field
+        if (colorScaleRef.current && scalarField.length > 0) {
+            const minVal = Math.min(...scalarField)
+            const maxVal = Math.max(...scalarField)
+            colorScaleRef.current.updateRange(minVal, maxVal)
+        }
 
         generateContours()
     }
@@ -213,6 +288,13 @@ export const ThreeScene = () => {
         // Calculate contour levels
         const minVal = Math.min(...scalarField)
         const maxVal = Math.max(...scalarField)
+
+        // Update ColorScale range when contours are regenerated
+        if (colorScaleRef.current) {
+            colorScaleRef.current.updateRange(minVal, maxVal)
+            colorScaleRef.current.setColorMap(colorTable)
+        }
+
         const isoList: number[] = []
         for (let i = 0; i < numContours; i++) {
             isoList.push(minVal + (i / (numContours - 1)) * (maxVal - minVal))

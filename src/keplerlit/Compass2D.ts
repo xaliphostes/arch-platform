@@ -50,6 +50,7 @@ export class Compass2D extends BaseOverlay {
             borderWidth: 1,
             labelOffset: 25,
             precision: 1,
+            autoRender: false,
             // Compass-specific defaults with proper fallbacks
             width: options.width ?? 200,
             height: options.height ?? 200,

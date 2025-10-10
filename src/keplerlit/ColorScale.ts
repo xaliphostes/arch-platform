@@ -1,4 +1,5 @@
 import { BaseOverlay, BaseOverlayOptions } from './BaseOverlay'
+import { colorMapToColorStops } from './colorMapAdapter'
 
 export interface ColorStop {
     position: number; // 0-1
@@ -10,16 +11,32 @@ export interface ColorScaleOptions extends BaseOverlayOptions {
     max: number;
     attributeName: string;
     orientation: 'vertical' | 'horizontal';
-    colorStops: ColorStop[];
+    colorStops?: ColorStop[];
+    colorMapName?: string; // NEW: Accept colorMap name
+    autoRender?: boolean;
 }
 
 export class ColorScale extends BaseOverlay {
-    protected options: Required<ColorScaleOptions>;
+    protected options: Required<ColorScaleOptions> & { colorMapName?: string };
 
     constructor(options: ColorScaleOptions) {
-        super(options);
-        
-        // Set default values - updated for scientific appearance
+        super({ ...options, autoRender: options.autoRender ?? false });
+
+        // Initialize color stops from colorMap name if provided
+        let colorStops: ColorStop[];
+        if (options.colorMapName && !options.colorStops) {
+            colorStops = colorMapToColorStops(options.colorMapName);
+        } else if (options.colorStops) {
+            colorStops = options.colorStops;
+        } else {
+            // Default gradient if nothing provided
+            colorStops = [
+                { position: 0.0, color: '#0000ff' },
+                { position: 0.5, color: '#00ff00' },
+                { position: 1.0, color: '#ff0000' }
+            ];
+        }
+
         this.options = {
             fontSize: 11,
             fontFamily: 'Arial, sans-serif',
@@ -29,20 +46,44 @@ export class ColorScale extends BaseOverlay {
             borderWidth: 1,
             labelOffset: 25,
             precision: 1,
+            autoRender: false,
+            colorStops,
+            colorMapName: options.colorMapName??"Rainbow",
             ...options
         };
 
-        this.render();
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
-    // Method to get color at specific value
+    /**
+     * Updates the color scale using a colorMap name
+     */
+    public setColorMap(colorMapName: string): void {
+        this.options.colorMapName = colorMapName;
+        this.options.colorStops = colorMapToColorStops(colorMapName);
+        
+        if (this.options.autoRender) {
+            this.render();
+        }
+    }
+
+    /**
+     * Gets the current colorMap name if set
+     */
+    public getColorMapName(): string | undefined {
+        return this.options.colorMapName;
+    }
+
+    /**
+     * Method to get color at specific value
+     */
     public getColorAtValue(value: number): string {
         const { min, max, colorStops } = this.options;
 
-        // Normalize value to 0-1 range
         const normalizedValue = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
-        // Find the appropriate color stops
         const sortedStops = [...colorStops].sort((a, b) => a.position - b.position);
 
         if (normalizedValue <= sortedStops[0].position) {
@@ -53,7 +94,6 @@ export class ColorScale extends BaseOverlay {
             return sortedStops[sortedStops.length - 1].color;
         }
 
-        // Interpolate between two stops
         for (let i = 0; i < sortedStops.length - 1; i++) {
             const stop1 = sortedStops[i];
             const stop2 = sortedStops[i + 1];
@@ -67,33 +107,53 @@ export class ColorScale extends BaseOverlay {
         return sortedStops[0].color;
     }
 
+    public updateLut(colorStops: ColorStop[]): void {
+        this.options.colorStops = colorStops;
+        this.options.colorMapName = ""; // Clear colorMap name when using custom stops
+        
+        if (this.options.autoRender) {
+            this.render();
+        }
+    }
+
     public updateRange(min: number, max: number): void {
         this.options.min = min;
         this.options.max = max;
-        this.render();
+        
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     public updateColorStops(colorStops: ColorStop[]): void {
         this.options.colorStops = colorStops;
-        this.render();
+        this.options.colorMapName = ""; // Clear colorMap name
+        
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     public updateOrientation(orientation: 'vertical' | 'horizontal'): void {
         this.options.orientation = orientation;
-        this.render();
+        
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     public updateAttributeName(name: string): void {
         this.options.attributeName = name;
-        this.render();
+        
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
-    // Getters for current state
-    public getOptions(): Readonly<Required<ColorScaleOptions>> {
+    public getOptions(): Readonly<Required<ColorScaleOptions> & { colorMapName?: string }> {
         return { ...this.options };
     }
 
-    // @override
     protected render(): void {
         if (!this.isVisible) return;
 
@@ -103,9 +163,10 @@ export class ColorScale extends BaseOverlay {
     }
 
     // -------------------------------------------------------
+    // Private methods
+    // -------------------------------------------------------
 
     private interpolateColor(color1: string, color2: string, t: number): string {
-        // Simple RGB interpolation
         const c1 = this.hexToRgb(color1);
         const c2 = this.hexToRgb(color2);
 
@@ -119,7 +180,20 @@ export class ColorScale extends BaseOverlay {
     }
 
     private hexToRgb(hex: string): { r: number, g: number, b: number } | null {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        // Handle both hex and rgb formats
+        hex = hex.replace('#', '');
+        
+        // Check if it's already in rgb format
+        const rgbMatch = hex.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (rgbMatch) {
+            return {
+                r: parseInt(rgbMatch[1]),
+                g: parseInt(rgbMatch[2]),
+                b: parseInt(rgbMatch[3])
+            };
+        }
+        
+        const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? {
             r: parseInt(result[1], 16),
             g: parseInt(result[2], 16),
@@ -137,7 +211,6 @@ export class ColorScale extends BaseOverlay {
             gradient = this.ctx.createLinearGradient(x, 0, x + width, 0);
         }
 
-        // Sort color stops by position
         const sortedStops = [...colorStops].sort((a, b) => a.position - b.position);
 
         for (const stop of sortedStops) {
@@ -152,7 +225,6 @@ export class ColorScale extends BaseOverlay {
 
         this.ctx.save();
 
-        // Draw background with slight padding and rounded corners
         if (backgroundColor !== 'transparent') {
             const padding = 1;
             this.ctx.fillStyle = backgroundColor;
@@ -160,13 +232,11 @@ export class ColorScale extends BaseOverlay {
             this.ctx.fill();
         }
 
-        // Draw gradient with subtle inner shadow effect
         const gradient = this.createGradient();
         this.ctx.fillStyle = gradient;
         this.roundRect(x, y, width, height, 1);
         this.ctx.fill();
 
-        // Draw subtle border
         if (borderWidth > 0) {
             this.ctx.strokeStyle = borderColor;
             this.ctx.lineWidth = borderWidth;
@@ -174,7 +244,6 @@ export class ColorScale extends BaseOverlay {
             this.ctx.stroke();
         }
 
-        // Add tick marks for better scientific appearance
         this.drawTickMarks();
 
         this.ctx.restore();
@@ -231,12 +300,10 @@ export class ColorScale extends BaseOverlay {
         this.ctx.fillStyle = textColor;
         this.ctx.font = `${fontSize}px ${fontFamily}`;
 
-        // Draw intermediate values for more scientific appearance
         const valueCount = 5;
         const tickOffset = 8;
 
         if (orientation === 'vertical') {
-            // Draw attribute name
             this.ctx.save();
             this.ctx.translate(x + width + labelOffset + fontSize * 2, y + height / 2);
             this.ctx.rotate(Math.PI / 2);
@@ -245,25 +312,22 @@ export class ColorScale extends BaseOverlay {
             this.ctx.fillText(attributeName, 0, 0);
             this.ctx.restore();
 
-            // Draw scale values
             this.ctx.textAlign = 'left';
             this.ctx.textBaseline = 'middle';
 
             for (let i = 0; i <= valueCount; i++) {
                 const position = i / valueCount;
-                const value = min + (max - min) * (1 - position); // Inverted for vertical
+                const value = min + (max - min) * (1 - position);
                 const labelY = y + position * height;
                 const formattedValue = this.formatValue(value, precision);
 
                 this.ctx.fillText(formattedValue, x + width + tickOffset, labelY);
             }
         } else {
-            // Horizontal orientation
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'top';
             this.ctx.fillText(attributeName, x + width / 2, y - labelOffset - fontSize);
 
-            // Draw scale values
             this.ctx.textBaseline = 'top';
 
             for (let i = 0; i <= valueCount; i++) {
@@ -278,5 +342,4 @@ export class ColorScale extends BaseOverlay {
 
         this.ctx.restore();
     }
-
 }

@@ -1,7 +1,8 @@
 import React from 'react'
-import { ThreeScene } from './components/ThreeScene'
 import { LeftPanel } from './components/LeftPanel'
 import { RightPanel } from './components/RightPanel'
+import { CollapsiblePanelWrapper } from './components/CollapsiblePanelWrapper'
+import { ThreeScene } from './components/ThreeScene'
 import { SceneProvider } from './contexts/SceneContext'
 import './App.css'
 
@@ -9,9 +10,15 @@ function App() {
     return (
         <SceneProvider>
             <div className="app-container">
-                <LeftPanel />
+                <CollapsiblePanelWrapper side="left" defaultWidth={250}>
+                    <LeftPanel />
+                </CollapsiblePanelWrapper>
+
                 <ThreeScene />
-                <RightPanel />
+
+                <CollapsiblePanelWrapper side="right" defaultWidth={300}>
+                    <RightPanel />
+                </CollapsiblePanelWrapper>
             </div>
         </SceneProvider>
     )

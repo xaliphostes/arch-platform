@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 export const LeftPanel = () => {
+    const [selectedModel, setSelectedModel] = useState('NashPoint')
+
     return (
         <div className="left-panel">
 
@@ -11,14 +13,14 @@ export const LeftPanel = () => {
                 <div className="control-group">
                     <label>Predefined models</label>
                     <select
-                        value="NashPoint"
-                        // onChange={(e) => setColorTable(e.target.value)}
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
                     >
-                        <option value="Blackbody">Simple</option>
-                        <option value="Grayscale">En Echelon</option>
+                        <option value="Simple">Simple</option>
+                        <option value="EnEchelon">En Echelon</option>
                         <option value="NashPoint">Nash Point</option>
-                        <option value="Insar">Hector Mine</option>
-                        <option value="InsarBanded">Galapagos</option>
+                        <option value="HectorMine">Hector Mine</option>
+                        <option value="Galapagos">Galapagos</option>
                     </select>
                 </div>
             </div>

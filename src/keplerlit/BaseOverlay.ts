@@ -1,5 +1,3 @@
-
-
 export interface BaseOverlayOptions {
     canvas: HTMLCanvasElement;
     x: number;
@@ -14,6 +12,7 @@ export interface BaseOverlayOptions {
     borderWidth?: number;
     labelOffset?: number;
     precision?: number;
+    autoRender?: boolean;
 }
 
 export class BaseOverlay {
@@ -26,6 +25,16 @@ export class BaseOverlay {
 
     constructor(options: BaseOverlayOptions) {
         this.canvas = options.canvas;
+
+        // Remove any existing overlay canvases to prevent duplicates
+        if (this.canvas.parentElement) {
+            const existingOverlays = this.canvas.parentElement.querySelectorAll('canvas[style*="z-index: 1000"]');
+            existingOverlays.forEach(overlay => {
+                if (overlay !== this.canvas) {
+                    overlay.remove();
+                }
+            });
+        }
 
         // Create overlay canvas
         this.overlayCanvas = document.createElement('canvas');
@@ -64,10 +73,14 @@ export class BaseOverlay {
             borderWidth: 1,
             labelOffset: 25,
             precision: 1,
+            autoRender: true,
             ...options
         };
 
-        this.render();
+        // Only render if autoRender is true
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     protected formatValue(value: number, precision: number): string {
@@ -92,20 +105,26 @@ export class BaseOverlay {
     public updatePosition(x: number, y: number): void {
         this.options.x = x;
         this.options.y = y;
-        this.render();
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     public updateSize(width: number, height: number): void {
         this.options.width = width;
         this.options.height = height;
-        this.render();
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     // Handle canvas resize
     public resize(width: number, height: number): void {
         this.overlayCanvas.width = width;
         this.overlayCanvas.height = height;
-        this.render();
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     // Cleanup method
@@ -122,7 +141,9 @@ export class BaseOverlay {
     public show(): void {
         this.isVisible = true;
         this.overlayCanvas.style.display = 'block';
-        this.render();
+        if (this.options.autoRender) {
+            this.render();
+        }
     }
 
     public hide(): void {

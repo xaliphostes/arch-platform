@@ -9,6 +9,8 @@ interface SceneContextType {
     addObject: (object: any) => void
 
     // Iso-contours parameters
+    attribute: string
+    setAttribute: (attr: string) => void
     displayMode: DisplayMode
     setDisplayMode: (mode: DisplayMode) => void
     numContours: number
@@ -32,6 +34,7 @@ export const SceneProvider = ({ children }: { children: ReactNode }) => {
     const [objects, setObjects] = useState<any[]>([])
 
     // Iso-contours state
+    const [attribute, setAttribute] = useState('z')
     const [displayMode, setDisplayMode] = useState<DisplayMode>('filled')
     const [numContours, setNumContours] = useState(10)
     const [colorTable, setColorTable] = useState('Rainbow')
@@ -51,6 +54,8 @@ export const SceneProvider = ({ children }: { children: ReactNode }) => {
             setSelectedObject,
             objects,
             addObject,
+            attribute,
+            setAttribute,
             displayMode,
             setDisplayMode,
             numContours,
