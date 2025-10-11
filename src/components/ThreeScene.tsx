@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useScene } from '../contexts/SceneContext'
+import { ModelLoader, PREDEFINED_MODELS } from '../utils/ModelLoader'
 
 import {
     BufferGeometry,
@@ -12,7 +13,6 @@ import {
 } from '../keplerlit'
 
 import CameraControls from 'camera-controls'
-import { GradientBackground } from '../keplerlit/GradientBackground'
 import { createComplexGradient } from '../keplerlit/FixedImageBackground'
 
 export const ThreeScene = () => {
@@ -23,23 +23,25 @@ export const ThreeScene = () => {
     const controlsRef = useRef<CameraControls | null>(null)
     const animationIdRef = useRef<number | null>(null)
     const colorScaleRef = useRef<any | null>(null)
+    const modelLoaderRef = useRef<ModelLoader | null>(null)
 
-    // Mesh references
-    const surfaceMeshRef = useRef<THREE.Mesh | null>(null)
-    const contourMeshRef = useRef<THREE.Mesh | null>(null)
-    const contourLinesRef = useRef<THREE.LineSegments | null>(null)
+    // References for iso-contour meshes (separate from model meshes)
+    const isoContourMeshesRef = useRef<Map<string, THREE.Mesh | THREE.LineSegments>>(new Map())
 
-    // Geometry data
-    const geometryDataRef = useRef<{ geometry: THREE.BufferGeometry; scalarField: number[] } | null>(null)
-
-    const { displayMode, numContours, colorTable } = useScene()
+    const {
+        displayMode,
+        numContours,
+        colorTable,
+        selectedModel,
+        loadedModelName,
+        setLoadedModelName
+    } = useScene()
 
     const clock = new THREE.Clock()
 
-    // Initialize Three.js scene
+    // Initialize Three.js scene (only once)
     useEffect(() => {
         if (!mountRef.current) return
-
 
         CameraControls.install({ THREE: THREE })
 
@@ -56,12 +58,12 @@ export const ThreeScene = () => {
         const camera = new THREE.PerspectiveCamera(
             75,
             mountRef.current.clientWidth / mountRef.current.clientHeight,
-            0.1,
-            1000
+            0.01,
+            100000
         )
-        camera.position.set(3, 3, 3)
+        camera.position.set(300, 300, 300)
         camera.lookAt(0, 0, 0)
-        camera.up.set( 0, 0, 1 );
+        camera.up.set(0, 0, 1)
         cameraRef.current = camera
 
         const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -77,22 +79,14 @@ export const ThreeScene = () => {
         scene.add(directionalLight)
 
         // Setup the controls
-        const controls = new CameraControls(camera, renderer.domElement);
+        const controls = new CameraControls(camera, renderer.domElement)
         controls.applyCameraUp()
         controlsRef.current = controls
 
-        //const gradient = new GradientBackground(scene, 'ocean')
+        // Background
         const background = createComplexGradient(scene, 'grayscale')
 
         // Initialize ColorScale
-        // const colorStops = [
-        //     { position: 0, color: '#0066cc' },
-        //     { position: 0.5, color: '#ffff00' },
-        //     { position: 1, color: '#cc0000' }
-        // ]
-
-        
-
         colorScaleRef.current = new ColorScale({
             canvas: renderer.domElement,
             x: mountRef.current.clientWidth - 100,
@@ -103,17 +97,19 @@ export const ThreeScene = () => {
             max: 100,
             attributeName: 'Scalar Value',
             orientation: 'vertical',
-            //colorStops: colorStops,
             colorMapName: 'Rainbow',
-            autoRender: false // Let React control rendering
+            autoRender: false
         })
+
+        // Initialize ModelLoader
+        modelLoaderRef.current = new ModelLoader()
 
         const animate = () => {
             animationIdRef.current = requestAnimationFrame(animate)
 
-            const delta = clock.getDelta();
-            const elapsed = clock.getElapsedTime();
-            const updated = controls.update(delta);
+            const delta = clock.getDelta()
+            const elapsed = clock.getElapsedTime()
+            const updated = controls.update(delta)
 
             renderer.render(scene, camera)
 
@@ -146,9 +142,6 @@ export const ThreeScene = () => {
         }
         window.addEventListener('resize', handleResize)
 
-        // Generate initial surface
-        generateSurface()
-
         return () => {
             window.removeEventListener('resize', handleResize)
             if (animationIdRef.current) {
@@ -158,45 +151,111 @@ export const ThreeScene = () => {
                 mountRef.current.removeChild(renderer.domElement)
             }
             if (colorScaleRef.current) {
-                // Cleanup ColorScale if it has a dispose method
                 if (typeof colorScaleRef.current.dispose === 'function') {
                     colorScaleRef.current.dispose()
                 }
+            }
+            // Clear all iso-contour meshes
+            clearIsoContourMeshes()
+
+            if (modelLoaderRef.current && sceneRef.current) {
+                modelLoaderRef.current.clearModels(sceneRef.current)
             }
             controls.dispose()
             renderer.dispose()
         }
     }, [])
 
-    // Update contours when parameters change
+    // Load model when selectedModel changes
     useEffect(() => {
-        generateContours()
-    }, [displayMode, numContours, colorTable])
+        const loadModel = async () => {
+            if (!sceneRef.current || !modelLoaderRef.current || !selectedModel) return
 
-    const createWaveSurface = (): [THREE.BufferGeometry, number[]] => {
-        const width = 4 * 34
-        const height = 4 * 34
-        const geometry = new THREE.PlaneGeometry(4, 4, width - 1, height - 1)
+            const config = PREDEFINED_MODELS[selectedModel]
+            if (!config) {
+                console.error(`Model ${selectedModel} not found in PREDEFINED_MODELS`)
+                return
+            }
 
-        const positions = geometry.attributes.position.array
-        const scalarField: number[] = []
+            // Clear previous model if it exists
+            if (loadedModelName && loadedModelName !== config.name) {
+                console.log(`Removing previous model: ${loadedModelName}`)
+                modelLoaderRef.current.removeModel(loadedModelName, sceneRef.current)
+                clearIsoContourMeshes()
+            }
 
-        for (let i = 0; i < positions.length; i += 3) {
-            const x = positions[i] / 4
-            const y = positions[i + 1] / 4
+            try {
+                console.log(`Loading model: ${config.name}`)
+                const loadedModel = await modelLoaderRef.current.loadModel(config, sceneRef.current)
+                setLoadedModelName(config.name)
 
-            const z = 0.5 * Math.sin(2 * Math.PI * x) * Math.cos(2 * Math.PI * y) +
-                0.3 * Math.sin(4 * Math.PI * x) * Math.sin(3 * Math.PI * y)
-            positions[i + 2] = z
+                // Calculate bounding box for all loaded meshes
+                const box = new THREE.Box3()
+                loadedModel.files.forEach(file => {
+                    if (file.mesh) {
+                        const meshBox = new THREE.Box3().setFromObject(file.mesh)
+                        box.union(meshBox)
+                    }
+                })
 
-            const scalar = Math.sqrt(x * x + y * y) + z
-            scalarField.push(scalar)
+                // Fit camera to see the entire model
+                if (controlsRef.current && !box.isEmpty()) {
+                    const center = box.getCenter(new THREE.Vector3())
+                    const size = box.getSize(new THREE.Vector3())
+                    const maxDim = Math.max(size.x, size.y, size.z)
+                    const fov = cameraRef.current?.fov || 75
+                    const cameraDistance = maxDim / (2 * Math.tan((fov * Math.PI) / 360))
+                    const distance = cameraDistance * 1.5  // Multiply by 1.5 to zoom out more  
+
+                    // Position camera to see the model
+                    if (cameraRef.current) {
+                        const offset = cameraDistance//distance * 1.2
+                        cameraRef.current.position.set(
+                            center.x + offset,     // X offset
+                            center.y + offset,     // Y offset  
+                            center.z + offset      // Z offset (same as X and Y for isometric)
+                        )
+                    }
+
+                    // Set controls target to model center
+                    controlsRef.current.setTarget(center.x, center.y, center.z, true)
+                }
+
+                console.log(`Model loaded successfully: ${config.name}`)
+
+                // Generate iso-contours for files marked with isoContour: true
+                generateIsoContours()
+
+            } catch (error) {
+                console.error(`Failed to load model ${config.name}:`, error)
+            }
         }
 
-        geometry.attributes.position.needsUpdate = true
-        geometry.computeVertexNormals()
+        if (selectedModel) {
+            loadModel()
+        }
+    }, [selectedModel])
 
-        return [geometry, scalarField]
+    // Update iso-contours when display parameters change
+    useEffect(() => {
+        if (loadedModelName) {
+            generateIsoContours()
+        }
+    }, [displayMode, numContours, colorTable, loadedModelName])
+
+    const clearIsoContourMeshes = () => {
+        if (!sceneRef.current) return
+
+        isoContourMeshesRef.current.forEach(mesh => {
+            sceneRef.current!.remove(mesh)
+            mesh.geometry.dispose()
+            if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(m => m.dispose())
+            } else {
+                mesh.material.dispose()
+            }
+        })
+        isoContourMeshesRef.current.clear()
     }
 
     const generateIndices = (vertexCount: number): Uint32Array => {
@@ -207,156 +266,135 @@ export const ThreeScene = () => {
         return new Uint32Array(indices)
     }
 
-    const clearMeshes = () => {
-        const meshes = [
-            surfaceMeshRef.current,
-            contourMeshRef.current,
-            contourLinesRef.current
-        ]
+    const generateIsoContours = () => {
+        if (!sceneRef.current || !modelLoaderRef.current || !loadedModelName) return
 
-        meshes.forEach(mesh => {
-            if (mesh && sceneRef.current) {
-                sceneRef.current.remove(mesh)
-                if (mesh.geometry) mesh.geometry.dispose()
-                if ((mesh as any).material) (mesh as any).material.dispose()
+        // Clear existing iso-contour meshes
+        clearIsoContourMeshes()
+
+        const loadedModel = modelLoaderRef.current.getModel(loadedModelName)
+        if (!loadedModel) return
+
+        // Find files marked for iso-contouring
+        const isoContourFiles = loadedModel.files.filter(f => f.file.isoContour === true)
+
+        if (isoContourFiles.length === 0) {
+            console.log('No files marked for iso-contouring')
+            return
+        }
+
+        console.log(`Generating iso-contours for ${isoContourFiles.length} file(s)`)
+
+        isoContourFiles.forEach((fileData, fileIndex) => {
+            const { file, data, mesh } = fileData
+
+            if (!mesh || !data.positions || !data.indices) {
+                console.warn(`Skipping ${file.name}: missing mesh or data`)
+                return
             }
-        })
 
-        surfaceMeshRef.current = null
-        contourMeshRef.current = null
-        contourLinesRef.current = null
-    }
+            try {
+                // Extract scalar field from Z coordinates
+                const scalarField: number[] = []
+                for (let i = 0; i < data.positions.length; i += 3) {
+                    scalarField.push(data.positions[i + 2]) // Z coordinate
+                }
 
-    const generateSurface = () => {
-        if (!sceneRef.current) return
+                // Convert to keplerlit format
+                const keplerPositions = new Float32BufferAttribute(Array.from(data.positions), 3)
+                const keplerIndices = new Uint32BufferAttribute(Array.from(data.indices), 1)
 
-        clearMeshes()
+                const keplerGeometry = new BufferGeometry()
+                keplerGeometry.setPositions(keplerPositions)
+                keplerGeometry.setIndices(keplerIndices)
 
-        const [geometry, scalarField] = createWaveSurface()
-        geometryDataRef.current = { geometry, scalarField }
+                // Calculate contour levels
+                const minVal = Math.min(...scalarField)
+                const maxVal = Math.max(...scalarField)
 
-        const material = new THREE.MeshPhongMaterial({
-            color: 0xffffff,
-            transparent: false,
-            opacity: 0.3
-        })
-        const mesh = new THREE.Mesh(geometry, material)
-        surfaceMeshRef.current = mesh
-        sceneRef.current.add(mesh)
+                // Update ColorScale range
+                if (colorScaleRef.current && fileIndex === 0) {
+                    colorScaleRef.current.updateRange(minVal, maxVal)
+                    colorScaleRef.current.setColorMap(colorTable)
+                }
 
-        // Update ColorScale range based on scalar field
-        if (colorScaleRef.current && scalarField.length > 0) {
-            const minVal = Math.min(...scalarField)
-            const maxVal = Math.max(...scalarField)
-            colorScaleRef.current.updateRange(minVal, maxVal)
-        }
+                const isoList: number[] = []
+                for (let i = 0; i < numContours; i++) {
+                    isoList.push(minVal + (i / (numContours - 1)) * (maxVal - minVal))
+                }
 
-        generateContours()
-    }
+                console.log(`Generating contours for ${file.name}: ${isoList.length} levels`)
 
-    const generateContours = () => {
-        if (!sceneRef.current || !geometryDataRef.current) return
-
-        // Clear existing contour meshes
-        if (contourMeshRef.current) {
-            sceneRef.current.remove(contourMeshRef.current)
-            contourMeshRef.current.geometry.dispose();
-            (contourMeshRef.current.material as THREE.Material).dispose()
-            contourMeshRef.current = null
-        }
-        if (contourLinesRef.current) {
-            sceneRef.current.remove(contourLinesRef.current)
-            contourLinesRef.current.geometry.dispose();
-            (contourLinesRef.current.material as THREE.Material).dispose()
-            contourLinesRef.current = null
-        }
-
-        const { geometry, scalarField } = geometryDataRef.current
-
-        // Convert to keplerlit format
-        const positions = geometry.attributes.position.array
-        const indices = geometry.index ?
-            geometry.index.array : generateIndices(positions.length / 3)
-
-        const keplerPositions = new Float32BufferAttribute(Array.from(positions), 3)
-        const keplerIndices = new Uint32BufferAttribute(Array.from(indices), 1)
-
-        const keplerGeometry = new BufferGeometry()
-        keplerGeometry.setPositions(keplerPositions)
-        keplerGeometry.setIndices(keplerIndices)
-
-        // Calculate contour levels
-        const minVal = Math.min(...scalarField)
-        const maxVal = Math.max(...scalarField)
-
-        // Update ColorScale range when contours are regenerated
-        if (colorScaleRef.current) {
-            colorScaleRef.current.updateRange(minVal, maxVal)
-            colorScaleRef.current.setColorMap(colorTable)
-        }
-
-        const isoList: number[] = []
-        for (let i = 0; i < numContours; i++) {
-            isoList.push(minVal + (i / (numContours - 1)) * (maxVal - minVal))
-        }
-
-        try {
-            // Generate filled contours
-            if (displayMode === 'filled' || displayMode === 'both') {
-                const result = createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
-                    lut: colorTable,
-                    nbColors: 512
-                })
-
-                if (result) {
-                    const meshGeometry = new THREE.BufferGeometry()
-                    meshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.position, 3))
-                    meshGeometry.setIndex(new THREE.Uint32BufferAttribute(result.index, 1))
-
-                    const colors = new Float32Array(result.color)
-                    meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-                    meshGeometry.computeVertexNormals()
-
-                    const material = new THREE.MeshPhongMaterial({
-                        vertexColors: true,
-                        side: THREE.DoubleSide,
-                        wireframe: false,
-                        flatShading: false,
-                        polygonOffset: true,
-                        polygonOffsetFactor: 0.5
+                // Generate filled contours
+                if (displayMode === 'filled' || displayMode === 'both') {
+                    const result = createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
+                        lut: colorTable,
+                        nbColors: 512
                     })
 
-                    const mesh = new THREE.Mesh(meshGeometry, material)
-                    contourMeshRef.current = mesh
-                    sceneRef.current.add(mesh)
+                    if (result) {
+                        const meshGeometry = new THREE.BufferGeometry()
+                        meshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.position, 3))
+                        meshGeometry.setIndex(new THREE.Uint32BufferAttribute(result.index, 1))
 
-                    if (surfaceMeshRef.current) {
-                        sceneRef.current.remove(surfaceMeshRef.current)
+                        const colors = new Float32Array(result.color)
+                        meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+                        meshGeometry.computeVertexNormals()
+
+                        const material = new THREE.MeshPhongMaterial({
+                            vertexColors: true,
+                            side: THREE.DoubleSide,
+                            wireframe: false,
+                            flatShading: false,
+                            polygonOffset: true,
+                            polygonOffsetFactor: 0.5
+                        })
+
+                        const contourMesh = new THREE.Mesh(meshGeometry, material)
+                        contourMesh.name = `${file.name}_isocontours_filled`
+                        sceneRef.current.add(contourMesh)
+                        isoContourMeshesRef.current.set(`${file.name}_filled`, contourMesh)
+
+                        // Hide the original mesh when showing iso-contours
+                        if (mesh) {
+                            mesh.visible = false
+                        }
+
+                        console.log(`Created filled contours for ${file.name}`)
                     }
                 }
-            }
 
-            // Generate line contours
-            if (displayMode === 'lines' || displayMode === 'both') {
-                const result = createIsoContourLines(keplerGeometry, scalarField, isoList, '#000000', colorTable)
+                // Generate line contours
+                if (displayMode === 'lines' || displayMode === 'both') {
+                    const result = createIsoContourLines(keplerGeometry, scalarField, isoList, '#000000', colorTable)
 
-                if (result.positions.length > 0) {
-                    const lineGeometry = new THREE.BufferGeometry()
-                    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3))
+                    if (result.positions.length > 0) {
+                        const lineGeometry = new THREE.BufferGeometry()
+                        lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3))
 
-                    const lineMaterial = new THREE.LineBasicMaterial({
-                        color: 0x000000,
-                        linewidth: 2
-                    })
+                        const lineMaterial = new THREE.LineBasicMaterial({
+                            color: 0x000000,
+                            linewidth: 2
+                        })
 
-                    const lines = new THREE.LineSegments(lineGeometry, lineMaterial)
-                    contourLinesRef.current = lines
-                    sceneRef.current.add(lines)
+                        const lines = new THREE.LineSegments(lineGeometry, lineMaterial)
+                        lines.name = `${file.name}_isocontours_lines`
+                        sceneRef.current.add(lines)
+                        isoContourMeshesRef.current.set(`${file.name}_lines`, lines)
+
+                        console.log(`Created line contours for ${file.name}`)
+                    }
                 }
+
+                // Show original mesh if only displaying lines
+                if (displayMode === 'lines' && mesh) {
+                    mesh.visible = true
+                }
+
+            } catch (error) {
+                console.error(`Error generating contours for ${file.name}:`, error)
             }
-        } catch (error) {
-            console.error('Error generating contours:', error)
-        }
+        })
     }
 
     return <div ref={mountRef} className="three-scene-container" />

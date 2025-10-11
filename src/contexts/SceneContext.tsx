@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react'
+import { ModelConfig } from '../utils/ModelLoader'
 
 type DisplayMode = 'filled' | 'lines' | 'both'
 
@@ -25,6 +26,12 @@ interface SceneContextType {
     setStressTheta: (theta: number) => void
     stressPressure: number
     setStressPressure: (pressure: number) => void
+
+    // Model loading
+    selectedModel: string
+    setSelectedModel: (model: string) => void
+    loadedModelName: string | null
+    setLoadedModelName: (name: string | null) => void
 }
 
 const SceneContext = createContext<SceneContextType | undefined>(undefined)
@@ -48,6 +55,11 @@ export const SceneProvider = ({ children }: { children: ReactNode }) => {
         setObjects([...objects, object])
     }
 
+    // Add model state
+    const [selectedModel, setSelectedModel] = useState('NashPoint')
+    const [loadedModelName, setLoadedModelName] = useState<string | null>(null)
+
+
     return (
         <SceneContext.Provider value={{
             selectedObject,
@@ -67,7 +79,12 @@ export const SceneProvider = ({ children }: { children: ReactNode }) => {
             stressTheta,
             setStressTheta,
             stressPressure,
-            setStressPressure
+            setStressPressure,
+
+            selectedModel,
+            setSelectedModel,
+            loadedModelName,
+            setLoadedModelName
         }}>
             {children}
         </SceneContext.Provider>

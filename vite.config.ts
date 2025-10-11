@@ -6,6 +6,7 @@ export default defineConfig({
     root: './',
     publicDir: 'public',
     base: '/arch-platform/', // must match your GitHub repo name
+    // assetsInclude: ['**/*.ts'], // Tell Vite to treat .ts files in public as assets
     optimizeDeps: {
         include: ['three', 'three/examples/jsm/controls/TrackballControls.js']
     },
