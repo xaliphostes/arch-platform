@@ -14,6 +14,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
     const {
         attribute,
         setAttribute,
+        availableAttributes,
         displayMode,
         setDisplayMode,
         numContours,
@@ -27,7 +28,9 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
             <div className="control-group horizontal">
                 <label>Attribute</label>
                 <select value={attribute} onChange={(e) => setAttribute(e.target.value)}>
-                    <option value="filled">z</option>
+                    {availableAttributes.map(attr => (
+                        <option key={attr} value={attr}>{attr}</option>
+                    ))}
                 </select>
             </div>
 
@@ -49,7 +52,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
                     <input
                         type="range"
                         min="3"
-                        max="100"
+                        max="30"
                         value={numContours}
                         onChange={(e) => setNumContours(Number(e.target.value))}
                         style={{ flex: 1 }}
@@ -57,7 +60,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
                     <input
                         type="number"
                         min="3"
-                        max="100"
+                        max="30"
                         value={numContours}
                         onChange={(e) => setNumContours(Number(e.target.value))}
                         style={{ width: '60px' }}

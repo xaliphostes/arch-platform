@@ -7,7 +7,7 @@
         "build:skip-check": "SKIP_TYPE_CHECK=true vite build",
         "dev": "vite",
         "preview": "vite preview",
-        "deploy": "gh-pages -d dist",
+        "deploy": "npm run build && gh-pages -d dist",
         "__node_publish__": "npm publish --access public"
     },
     "keywords": [

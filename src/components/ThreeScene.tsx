@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useScene } from '../contexts/SceneContext'
-import { ModelLoader, PREDEFINED_MODELS } from '../utils/ModelLoader'
+import { ModelLoader, PREDEFINED_MODELS, getAttributeNames, getAttributeSerie } from '../utils/ModelLoader'
 
 import {
     BufferGeometry,
@@ -29,6 +29,9 @@ export const ThreeScene = () => {
     const isoContourMeshesRef = useRef<Map<string, THREE.Mesh | THREE.LineSegments>>(new Map())
 
     const {
+        attribute,
+        setAttribute,
+        setAvailableAttributes,
         displayMode,
         numContours,
         colorTable,
@@ -61,7 +64,7 @@ export const ThreeScene = () => {
             0.01,
             100000
         )
-        camera.position.set(300, 300, 300)
+        camera.position.set(0, 0, 1)
         camera.lookAt(0, 0, 0)
         camera.up.set(0, 0, 1)
         cameraRef.current = camera
@@ -169,7 +172,7 @@ export const ThreeScene = () => {
     // Load model when selectedModel changes
     useEffect(() => {
         const loadModel = async () => {
-            if (!sceneRef.current || !modelLoaderRef.current || !selectedModel) return
+            if (!sceneRef.current || !modelLoaderRef.current || !selectedModel || selectedModel === '') return
 
             const config = PREDEFINED_MODELS[selectedModel]
             if (!config) {
@@ -189,36 +192,32 @@ export const ThreeScene = () => {
                 const loadedModel = await modelLoaderRef.current.loadModel(config, sceneRef.current)
                 setLoadedModelName(config.name)
 
-                // Calculate bounding box for all loaded meshes
-                const box = new THREE.Box3()
-                loadedModel.files.forEach(file => {
-                    if (file.mesh) {
-                        const meshBox = new THREE.Box3().setFromObject(file.mesh)
-                        box.union(meshBox)
-                    }
-                })
+                // Extract available attributes from the first file marked for iso-contouring
+                const isoContourFile = loadedModel.files.find(f => f.file.isoContour === true)
+                if (isoContourFile) {
+                    console.log('ISO contour file found:', isoContourFile.file.name)
+                    console.log('Number of dataframes:', isoContourFile.dataframes.length)
+                    console.log('Number of managers:', isoContourFile.managers.length)
+                    
+                    const attributeNames = getAttributeNames(isoContourFile)
+                    console.log('Extracted attribute names:', attributeNames)
+                    
+                    // Always include 'z' as a fallback
+                    const availableAttrs = attributeNames.length > 0 ? ['z', ...attributeNames] : ['z']
+                    setAvailableAttributes(availableAttrs)
+                    
+                    // Set default attribute to 'z'
+                    setAttribute('z')
+                    
+                    console.log('Available attributes set to:', availableAttrs)
+                } else {
+                    console.log('No ISO contour file found in model')
+                    setAvailableAttributes(['z'])
+                    setAttribute('z')
+                }
 
-                // Fit camera to see the entire model
-                if (controlsRef.current && !box.isEmpty()) {
-                    const center = box.getCenter(new THREE.Vector3())
-                    const size = box.getSize(new THREE.Vector3())
-                    const maxDim = Math.max(size.x, size.y, size.z)
-                    const fov = cameraRef.current?.fov || 75
-                    const cameraDistance = maxDim / (2 * Math.tan((fov * Math.PI) / 360))
-                    const distance = cameraDistance * 1.5  // Multiply by 1.5 to zoom out more  
-
-                    // Position camera to see the model
-                    if (cameraRef.current) {
-                        const offset = cameraDistance//distance * 1.2
-                        cameraRef.current.position.set(
-                            center.x + offset,     // X offset
-                            center.y + offset,     // Y offset  
-                            center.z + offset      // Z offset (same as X and Y for isometric)
-                        )
-                    }
-
-                    // Set controls target to model center
-                    controlsRef.current.setTarget(center.x, center.y, center.z, true)
+                if (cameraRef.current) {
+                    cameraRef.current.position.set(0, 1, 1);
                 }
 
                 console.log(`Model loaded successfully: ${config.name}`)
@@ -241,7 +240,7 @@ export const ThreeScene = () => {
         if (loadedModelName) {
             generateIsoContours()
         }
-    }, [displayMode, numContours, colorTable, loadedModelName])
+    }, [displayMode, numContours, colorTable, loadedModelName, attribute])
 
     const clearIsoContourMeshes = () => {
         if (!sceneRef.current) return
@@ -256,14 +255,6 @@ export const ThreeScene = () => {
             }
         })
         isoContourMeshesRef.current.clear()
-    }
-
-    const generateIndices = (vertexCount: number): Uint32Array => {
-        const indices: number[] = []
-        for (let i = 0; i < vertexCount - 2; i += 3) {
-            indices.push(i, i + 1, i + 2)
-        }
-        return new Uint32Array(indices)
     }
 
     const generateIsoContours = () => {
@@ -286,23 +277,65 @@ export const ThreeScene = () => {
         console.log(`Generating iso-contours for ${isoContourFiles.length} file(s)`)
 
         isoContourFiles.forEach((fileData, fileIndex) => {
-            const { file, data, mesh } = fileData
+            const { file, dataframes, meshes, managers } = fileData
 
-            if (!mesh || !data.positions || !data.indices) {
-                console.warn(`Skipping ${file.name}: missing mesh or data`)
+            if (meshes.length === 0 || dataframes.length === 0) {
+                console.warn(`Skipping ${file.name}: missing meshes or dataframes`)
                 return
             }
 
             try {
-                // Extract scalar field from Z coordinates
-                const scalarField: number[] = []
-                for (let i = 0; i < data.positions.length; i += 3) {
-                    scalarField.push(data.positions[i + 2]) // Z coordinate
+                // Get scalar field from selected attribute
+                let scalarField: number[] = []
+                
+                if (attribute === 'z') {
+                    // Use Z coordinates as fallback
+                    const firstMesh = meshes[0]
+                    const positions = firstMesh.geometry.attributes.position.array
+                    for (let i = 0; i < positions.length; i += 3) {
+                        scalarField.push(positions[i + 2])
+                    }
+                } else if (managers && managers.length > 0) {
+                    // Use selected attribute from first Manager
+                    const serie = getAttributeSerie(fileData, attribute)
+                    if (serie && serie.array) {
+                        scalarField = Array.from(serie.array)
+                    } else {
+                        console.warn(`Attribute ${attribute} not found, falling back to Z`)
+                        // Fallback to Z
+                        const firstMesh = meshes[0]
+                        const positions = firstMesh.geometry.attributes.position.array
+                        for (let i = 0; i < positions.length; i += 3) {
+                            scalarField.push(positions[i + 2])
+                        }
+                    }
+                } else {
+                    console.warn(`No managers available for ${file.name}, using Z coordinates`)
+                    const firstMesh = meshes[0]
+                    const positions = firstMesh.geometry.attributes.position.array
+                    for (let i = 0; i < positions.length; i += 3) {
+                        scalarField.push(positions[i + 2])
+                    }
+                }
+
+                if (scalarField.length === 0) {
+                    console.warn(`No scalar field data for ${file.name}`)
+                    return
+                }
+
+                // Get positions and indices from first mesh
+                const firstMesh = meshes[0]
+                const positionsArray = firstMesh.geometry.attributes.position.array
+                const indicesArray = firstMesh.geometry.index?.array
+
+                if (!indicesArray) {
+                    console.warn(`No indices for ${file.name}`)
+                    return
                 }
 
                 // Convert to keplerlit format
-                const keplerPositions = new Float32BufferAttribute(Array.from(data.positions), 3)
-                const keplerIndices = new Uint32BufferAttribute(Array.from(data.indices), 1)
+                const keplerPositions = new Float32BufferAttribute(Array.from(positionsArray), 3)
+                const keplerIndices = new Uint32BufferAttribute(Array.from(indicesArray), 1)
 
                 const keplerGeometry = new BufferGeometry()
                 keplerGeometry.setPositions(keplerPositions)
@@ -316,6 +349,7 @@ export const ThreeScene = () => {
                 if (colorScaleRef.current && fileIndex === 0) {
                     colorScaleRef.current.updateRange(minVal, maxVal)
                     colorScaleRef.current.setColorMap(colorTable)
+                    colorScaleRef.current.updateAttributeName(attribute)
                 }
 
                 const isoList: number[] = []
@@ -323,7 +357,7 @@ export const ThreeScene = () => {
                     isoList.push(minVal + (i / (numContours - 1)) * (maxVal - minVal))
                 }
 
-                console.log(`Generating contours for ${file.name}: ${isoList.length} levels`)
+                console.log(`Generating contours for ${file.name} using attribute "${attribute}": ${isoList.length} levels`)
 
                 // Generate filled contours
                 if (displayMode === 'filled' || displayMode === 'both') {
@@ -355,10 +389,8 @@ export const ThreeScene = () => {
                         sceneRef.current.add(contourMesh)
                         isoContourMeshesRef.current.set(`${file.name}_filled`, contourMesh)
 
-                        // Hide the original mesh when showing iso-contours
-                        if (mesh) {
-                            mesh.visible = false
-                        }
+                        // Hide the original meshes when showing iso-contours
+                        meshes.forEach(mesh => mesh.visible = false)
 
                         console.log(`Created filled contours for ${file.name}`)
                     }
@@ -386,9 +418,9 @@ export const ThreeScene = () => {
                     }
                 }
 
-                // Show original mesh if only displaying lines
-                if (displayMode === 'lines' && mesh) {
-                    mesh.visible = true
+                // Show original meshes if only displaying lines
+                if (displayMode === 'lines') {
+                    meshes.forEach(mesh => mesh.visible = true)
                 }
 
             } catch (error) {
