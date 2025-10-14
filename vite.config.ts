@@ -11,6 +11,14 @@ export default defineConfig({
         include: ['three', 'three/examples/jsm/controls/TrackballControls.js']
     },
     build: {
-        outDir: 'dist'
+        outDir: 'dist',
+        rollupOptions: {
+            onwarn(warning, warn) {
+                // Suppress warnings from node_modules
+                if (warning.code === 'MODULE_LEVEL_DIRECTIVE') return;
+                if (warning.loc && warning.loc.file?.includes('node_modules')) return;
+                warn(warning);
+            }
+        }
     }
 });

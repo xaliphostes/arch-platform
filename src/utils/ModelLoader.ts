@@ -75,7 +75,7 @@ export class ModelLoader {
             }
         }
 
-        // Second pass: normalize all together
+        // // Second pass: normalize all together
         // const globalBox = new THREE.Box3();
         // loadedFiles.forEach(f => {
         //     if (f.mesh) globalBox.expandByObject(f.mesh);
@@ -318,12 +318,12 @@ export class ModelLoader {
     }
 }
 
+// Base path for models - to be adjusted based vite.config.ts base setting
+const BASE_PATH = '/arch-platform';
+
 /**
  * Predefined model configurations
  */
-// Base path for models - adjust based on your vite.config.ts base setting
-const BASE_PATH = '/arch-platform';
-
 export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
     Galapagos: {
         name: 'Galapagos',
@@ -340,26 +340,5 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
             { path: `${BASE_PATH}/models/NashPoint/all_joints_3D.ts`, type: 'TS', name: 'Joints 3D', color: 0x000000, isoContour: false },
             { path: `${BASE_PATH}/models/NashPoint/all_joints.pl`, type: 'PL', name: 'Joints Lines', color: 0xffffff, isoContour: false }
         ]
-    },
-    // Simple: {
-    //     name: 'Simple',
-    //     files: [
-    //         { path: `${BASE_PATH}/models/fault.gocad`, type: 'TS', name: 'Fault', color: 0xff6b6b },
-    //         { path: `${BASE_PATH}/models/grid.gocad`, type: 'TS', name: 'Grid', color: 0x95a5a6 }
-    //     ]
-    // },
-    // EnEchelon: {
-    //     name: 'En Echelon',
-    //     files: [
-    //         { path: `${BASE_PATH}/models/EnEchelon/faults.gocad`, type: 'TS', name: 'Faults', color: 0xff6b6b },
-    //         { path: `${BASE_PATH}/models/EnEchelon/grid.gocad`, type: 'TS', name: 'Grid', color: 0x95a5a6 }
-    //     ]
-    // },
-    // HectorMine: {
-    //     name: 'Hector Mine',
-    //     files: [
-    //         { path: `${BASE_PATH}/models/HectorMine/fault.gocad`, type: 'TS', name: 'Fault', color: 0xff6b6b },
-    //         { path: `${BASE_PATH}/models/HectorMine/surface.gocad`, type: 'TS', name: 'Surface', color: 0x8b7355 }
-    //     ]
-    // }
-};
+    }
+};  
