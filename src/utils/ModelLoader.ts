@@ -445,7 +445,7 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
             {
                 path: `${BASE_PATH}/models/NashPoint/NashPoint_faults.ts`,
                 type: 'TS', name: 'Faults',
-                color: 0xff6b6b,
+                color: 0x8888ff,
                 isoContour: false,
                 geologicalType: 'Discontinuity'
             },
@@ -453,7 +453,7 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
                 path: `${BASE_PATH}/models/NashPoint/all_joints_3D.ts`,
                 type: 'TS',
                 name: 'Joints 3D',
-                color: 0x000000,
+                color: 0xff8888,
                 isoContour: false,
                 geologicalType: 'Unknown',
                 visible: true
