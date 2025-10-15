@@ -197,7 +197,7 @@ export const ThreeScene = () => {
             }
 
             try {
-                console.log(`Loading model: ${config.name}`)
+                // console.log(`Loading model: ${config.name}`)
                 const loadedModel = await modelLoaderRef.current.loadModel(config, sceneRef.current)
                 setLoadedModelName(config.name)
 
@@ -234,7 +234,7 @@ export const ThreeScene = () => {
                     cameraRef.current.position.set(0, 1, 1);
                 }
 
-                console.log(`Model loaded successfully: ${config.name}`)
+                // console.log(`Model loaded successfully: ${config.name}`)
 
                 // Generate iso-contours for files marked with isoContour: true
                 generateIsoContours()
@@ -348,7 +348,7 @@ export const ThreeScene = () => {
         // If no files to process (selection doesn't support iso-contours),
         // restore all files to their saved states
         if (filesToProcess.length === 0) {
-            console.log('Selected object does not support iso-contouring, restoring saved states');
+            // console.log('Selected object does not support iso-contouring, restoring saved states');
 
             // Restore each file to its saved visualization state
             loadedModel.files.forEach(fileData => {
@@ -377,7 +377,7 @@ export const ThreeScene = () => {
             return;
         }
 
-        console.log(`Generating iso-contours for ${filesToProcess.length} file(s)`);
+        // console.log(`Generating iso-contours for ${filesToProcess.length} file(s)`);
 
         // Clear iso-contours ONLY for files being processed
         filesToProcess.forEach(fileData => {
@@ -481,7 +481,7 @@ export const ThreeScene = () => {
                     isoList.push(minVal + (i / (numContours - 1)) * (maxVal - minVal))
                 }
 
-                console.log(`Generating contours for ${file.name} using attribute "${attribute}": ${isoList.length} levels`)
+                // console.log(`Generating contours for ${file.name} using attribute "${attribute}": ${isoList.length} levels`)
 
                 // Generate filled contours
                 if (displayMode === 'filled' || displayMode === 'both') {
@@ -516,7 +516,7 @@ export const ThreeScene = () => {
                         // Hide the original meshes when showing iso-contours
                         meshes.forEach(mesh => mesh.visible = false)
 
-                        console.log(`Created filled contours for ${file.name}`)
+                        // console.log(`Created filled contours for ${file.name}`)
                     }
                 }
 
@@ -538,7 +538,7 @@ export const ThreeScene = () => {
                         sceneRef.current!.add(lines)
                         isoContourMeshesRef.current.set(`${file.name}_lines`, lines)
 
-                        console.log(`Created line contours for ${file.name}`)
+                        // console.log(`Created line contours for ${file.name}`)
                     }
                 }
 
