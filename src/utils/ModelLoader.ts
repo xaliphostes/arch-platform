@@ -468,5 +468,47 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
                 visible: true
             }
         ]
+    },
+    Tet: {
+        name: 'Tet',
+        files: [
+            {
+                path: `${BASE_PATH}/models/Tet/mnt.ts`,
+                type: 'TS',
+                name: 'Topography',
+                color: 0x4ecdc4,
+                isoContour: true,
+                geologicalType: 'Grid'
+            },
+            {
+                path: `${BASE_PATH}/models/Tet/faults.ts`,
+                type: 'TS',
+                name: 'Faults',
+                color: 0x8888FF,
+                isoContour: false,
+                geologicalType: 'Discontinuity'
+            }
+        ]
+    },
+    Matelles: {
+        name: 'Matelles',
+        files: [
+            {
+                path: `${BASE_PATH}/models/Matelles/grid.ts`,
+                type: 'TS',
+                name: 'Topography',
+                color: 0x4ecdc4,
+                isoContour: true,
+                geologicalType: 'Grid'
+            },
+            {
+                path: `${BASE_PATH}/models/Matelles/faults_friction.ts`,
+                type: 'TS',
+                name: 'Faults',
+                color: 0x8888FF,
+                isoContour: false,
+                geologicalType: 'Discontinuity'
+            }
+        ]
     }
 };

@@ -22,6 +22,14 @@ interface SceneContextType {
     setStressTheta: (value: number) => void;
     stressPressure: number;
     setStressPressure: (value: number) => void;
+
+    selectedObject: string | null; // Format: "modelName:fileIndex" or "modelName"
+    setSelectedObject: (object: string | null) => void;
+    fileVisualizationStates: Map<string, 'original' | 'iso'>;
+    setFileVisualizationState: (filePath: string, state: 'original' | 'iso') => void;
+    visibilityStates: Map<string, boolean>;
+    setFileVisibility: (filePath: string, visible: boolean) => void;
+
 }
 
 const SceneContext = createContext<SceneContextType | undefined>(undefined);
@@ -39,6 +47,26 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [stressR, setStressR] = useState<number>(1.5);
     const [stressTheta, setStressTheta] = useState<number>(90);
     const [stressPressure, setStressPressure] = useState<number>(50);
+
+    const [selectedObject, setSelectedObject] = useState<string | null>(null);
+    const [fileVisualizationStates, setFileVisualizationStates] = useState<Map<string, 'original' | 'iso'>>(new Map());
+    const [visibilityStates, setVisibilityStates] = useState<Map<string, boolean>>(new Map());
+
+    const setFileVisualizationState = (filePath: string, state: 'original' | 'iso') => {
+        setFileVisualizationStates(prev => {
+            const newMap = new Map(prev);
+            newMap.set(filePath, state);
+            return newMap;
+        });
+    };
+
+    const setFileVisibility = (filePath: string, visible: boolean) => {
+        setVisibilityStates(prev => {
+            const next = new Map(prev);
+            next.set(filePath, visible);
+            return next;
+        });
+    };
 
     return (
         <SceneContext.Provider
@@ -62,7 +90,14 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 stressTheta,
                 setStressTheta,
                 stressPressure,
-                setStressPressure
+                setStressPressure,
+
+                selectedObject,
+                setSelectedObject,
+                fileVisualizationStates,
+                setFileVisualizationState,
+                visibilityStates,
+                setFileVisibility
             }}
         >
             {children}
