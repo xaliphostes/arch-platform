@@ -221,17 +221,17 @@ export const ThreeScene = () => {
                     // console.log('Extracted attribute names:', attributeNames)
 
                     // Always include 'z' as a fallback
-                    const availableAttrs = attributeNames.length > 0 ? ['z', ...attributeNames] : ['z']
+                    const availableAttrs = attributeNames.length > 0 ? ['z', ...attributeNames] : ['Ux']
                     setAvailableAttributes(availableAttrs)
 
                     // Set default attribute to 'z'
-                    setAttribute('z')
+                    setAttribute('Ux')
 
                     // console.log('Available attributes set to:', availableAttrs)
                 } else {
                     // console.log('No ISO contour file found in model')
-                    setAvailableAttributes(['z'])
-                    setAttribute('z')
+                    setAvailableAttributes(['Ux'])
+                    setAttribute('Ux')
                 }
 
                 if (cameraRef.current) {
