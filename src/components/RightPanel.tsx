@@ -9,7 +9,7 @@ import {
 
 export const RightPanel: React.FC = () => {
     const [isContoursOpen, setIsContoursOpen] = useState(true);
-    const [isStressOpen, setIsStressOpen] = useState(false);
+    const [isStressOpen, setIsStressOpen] = useState(true);
     const [isPressureOpen, setIsPressureOpen] = useState(false);
     const [isDeformOpen, setIsDeformOpen] = useState(false);
 
@@ -20,10 +20,10 @@ export const RightPanel: React.FC = () => {
                 onToggle={() => setIsContoursOpen(!isContoursOpen)}
             />
 
-            <DeformPanel
+            {/* <DeformPanel
                 isOpen={isDeformOpen}
                 onToggle={() => setIsDeformOpen(!isDeformOpen)}
-            />
+            /> */}
 
             <br />
             <hr />
@@ -34,10 +34,10 @@ export const RightPanel: React.FC = () => {
                 onToggle={() => setIsStressOpen(!isStressOpen)}
             />
 
-            <PressurePanel
+            {/* <PressurePanel
                 isOpen={isPressureOpen}
                 onToggle={() => setIsPressureOpen(!isPressureOpen)}
-            />
+            /> */}
         </div>
     );
 };

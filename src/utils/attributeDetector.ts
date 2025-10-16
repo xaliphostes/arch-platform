@@ -5,13 +5,15 @@ export type ReturnType = {
     name: string
     start: number
     end: number
-}[]
+}
+
+export type ReturnTypes = ReturnType[]
 
 /**
  * From superposition, guess the dimension as well as the Serie's names
  * @category Utils
  */
-export function attributeDetector(dataframe: DataFrame): ReturnType {
+export function attributeDetector(dataframe: DataFrame): ReturnTypes {
     const names = getNameSeries(dataframe)
     const set = new Set()
     names.forEach((name: string) => {

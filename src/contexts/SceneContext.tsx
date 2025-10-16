@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, ReactNode } from 'react';
+import { ModelLoader } from '../utils/ModelLoader';
 
 interface SceneContextType {
     attribute: string;
@@ -30,6 +31,15 @@ interface SceneContextType {
     visibilityStates: Map<string, boolean>;
     setFileVisibility: (filePath: string, visible: boolean) => void;
 
+    combinedWeights: Map<string, number[]>; // key = family prefix (e.g. "Vp")
+    setCombinedWeights: (updater: (prev: Map<string, number[]>) => Map<string, number[]>) => void;
+
+    // Force regeneration trigger
+    regenerationTrigger: number;
+    triggerRegeneration: () => void;
+
+    // ModelLoader reference
+    modelLoaderRef: React.MutableRefObject<ModelLoader | null>;
 }
 
 const SceneContext = createContext<SceneContextType | undefined>(undefined);
@@ -40,9 +50,9 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [displayMode, setDisplayMode] = useState<'filled' | 'lines' | 'both'>('filled');
     const [numContours, setNumContours] = useState<number>(20);
     const [colorTable, setColorTable] = useState<string>('Rainbow');
-    const [selectedModel, setSelectedModel] = useState<string | null>('Galapagos'); // Changed from null to empty string
+    const [selectedModel, setSelectedModel] = useState<string | null>('NashPoint'); // Changed from null to empty string
     const [loadedModelName, setLoadedModelName] = useState<string | null>(''); // Changed from null to empty string
-    
+
     // Tectonic stress parameters
     const [stressR, setStressR] = useState<number>(1.5);
     const [stressTheta, setStressTheta] = useState<number>(90);
@@ -51,6 +61,11 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [selectedObject, setSelectedObject] = useState<string | null>(null);
     const [fileVisualizationStates, setFileVisualizationStates] = useState<Map<string, 'original' | 'iso'>>(new Map());
     const [visibilityStates, setVisibilityStates] = useState<Map<string, boolean>>(new Map());
+    const [combinedWeights, _setCombinedWeights] = useState<Map<string, number[]>>(new Map());
+
+    // Add these new state and ref:
+    const [regenerationTrigger, setRegenerationTrigger] = useState<number>(0);
+    const modelLoaderRef = useRef<ModelLoader | null>(null);
 
     const setFileVisualizationState = (filePath: string, state: 'original' | 'iso') => {
         setFileVisualizationStates(prev => {
@@ -66,6 +81,14 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             next.set(filePath, visible);
             return next;
         });
+    };
+
+    const setCombinedWeights = (updater: (prev: Map<string, number[]>) => Map<string, number[]>) => {
+        _setCombinedWeights(prev => updater(prev));
+    };
+
+    const triggerRegeneration = () => {
+        setRegenerationTrigger(prev => prev + 1);
     };
 
     return (
@@ -97,7 +120,14 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 fileVisualizationStates,
                 setFileVisualizationState,
                 visibilityStates,
-                setFileVisibility
+                setFileVisibility,
+
+                combinedWeights,
+                setCombinedWeights,
+
+                regenerationTrigger,
+                triggerRegeneration,
+                modelLoaderRef
             }}
         >
             {children}

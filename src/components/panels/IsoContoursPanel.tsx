@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useScene } from '../../contexts/SceneContext';
 import { CollapsibleSubPanel } from './CollapsibleSubPanel';
-import { PREDEFINED_MODELS } from '../../utils/ModelLoader';
+import { PREDEFINED_MODELS } from '../../models/predefinedModels';
 
 interface IsoContoursPanelProps {
     isOpen: boolean;

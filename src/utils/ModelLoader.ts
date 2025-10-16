@@ -1,69 +1,36 @@
 // src/utils/ModelLoader.ts
 import * as THREE from 'three';
 import { decodeGocadTS, decodeGocadPL, decodeGocadSO, decodeGocadVS } from '@youwol/io';
-import type { DataFrame, Serie } from '@youwol/dataframe';
+import { weightedSum } from '@youwol/math'
+import { DataFrame, Serie } from '@youwol/dataframe';
 import { Manager } from '@youwol/dataframe';
 import { PositionDecomposer } from '@youwol/math';
 import { ComponentDecomposer } from '@youwol/math';
 import { EigenValuesDecomposer } from '@youwol/math';
 import { attributeDetector } from '@youwol/geophysics';
+import { append } from '@youwol/dataframe';
+import { insertSerie } from '@youwol/dataframe';
+import { ReturnType, ReturnTypes } from './attributeDetector';
+import { DecodedGOCAD, LoadedModel, ModelConfig, ModelFile } from './types';
+import { simpleAndersonMapping } from './mapping';
 
-/**
- * Model file configuration
- */
-export interface ModelFile {
-    path: string;
-    type: 'TS' | 'PL' | 'SO' | 'VS';
-    name?: string;
-    color?: string | number;
-    isoContour?: boolean;
-    visible?: boolean;
-    geologicalType: 'Discontinuity' | 'Grid' | 'Unknown'
-}
+export type AttributeFamilies = Record<string, string[]> // { prefix: [attr1, attr2, ...] }
 
-/**
- * Complete model configuration
- */
-export interface ModelConfig {
-    name: string;
-    files: ModelFile[];
-}
 
-/**
- * Decoded GOCAD data structure (legacy for single mesh)
- */
-export interface DecodedGOCAD {
-    positions?: Float32Array;
-    indices?: Uint32Array;
-    segments?: Uint32Array;
-    count: number;
-    attributes?: { [key: string]: Float32Array };
-}
 
-/**
- * Loaded model data with Three.js objects
- * Now supports multiple meshes per file
- */
-export interface LoadedModel {
-    name: string;
-    files: {
-        file: ModelFile;
-        dataframes: DataFrame[];
-        meshes: (THREE.Mesh | THREE.LineSegments)[];
-        managers: Manager[]; // One Manager per DataFrame
-    }[];
-}
+// --------------------------------------------------------------------
 
 /**
  * Helper to get available attribute names from a loaded model file
  */
+// Beurk du [0]
 export function getAttributeNames(loadedFile: LoadedModel['files'][0]): string[] {
     if (!loadedFile.dataframes || loadedFile.dataframes.length === 0) {
         console.warn('No dataframes available in loaded file');
         return [];
     }
 
-    const dataframe = loadedFile.dataframes[0];
+    //const dataframe = loadedFile.dataframes[0];
 
     if (loadedFile.managers && loadedFile.managers.length > 0) {
         const manager = loadedFile.managers[0];
@@ -78,6 +45,7 @@ export function getAttributeNames(loadedFile: LoadedModel['files'][0]): string[]
  * Helper to get a Serie for a specific attribute from a loaded model file
  * Returns the Serie from the first DataFrame
  */
+// Beurk du [0]
 export function getAttributeSerie(
     loadedFile: LoadedModel['files'][0],
     attributeName: string
@@ -88,6 +56,30 @@ export function getAttributeSerie(
 
     // Get serie from first manager
     return loadedFile.managers[0].serie(0, attributeName);
+}
+
+
+
+// Beurk du [0]
+export function doWeightedSum(loadedFile: LoadedModel['files'][0], theta: number, R: number) {
+    //console.log(theta, R)
+    const alpha = simpleAndersonMapping([theta, R])
+    loadedFile.detects.forEach((detects, i) => detects.forEach(detect => {
+        const df = loadedFile.dataframes[i]
+        const udf = loadedFile.dataframesUser[i]
+        const name = detect.name
+        const nb = detect.end - detect.start + 1
+        const S: Serie[] = []
+
+        for (let i = detect.start; i <= detect.end; ++i) {
+            S.push(df.series[`${name}${i}`])
+        }
+
+        const alpha_bis = new Array(nb).fill(1)
+
+        const weightedSerie = weightedSum(S, alpha.length == nb ? alpha : alpha_bis)
+        udf.series[name] = weightedSerie
+    }))
 }
 
 /**
@@ -107,27 +99,76 @@ export class ModelLoader {
         for (const file of config.files) {
             try {
                 const dataframes = await this.fetchAndDecode(file);
+                const dataframesUser: DataFrame[] = []
+
                 const meshes = this.createMeshesFromDataFrames(dataframes, file);
 
+                const allDetects: ReturnTypes[] = []
+
                 // Create one Manager per DataFrame
-                const managers = dataframes.map(df => new Manager(df, {
-                    decomposers: [
-                        new PositionDecomposer,
-                        new ComponentDecomposer,
-                        new EigenValuesDecomposer,
-                    ]
-                }));
+                const managers = dataframes.map(df => {
+                    // User dataframe
+                    const udf = DataFrame.create({
+                        series: {
+                            positions: df.series.positions.clone()
+                        }
+                    })
+                    if (df.series.indices) {
+                        const clone = df.series.indices.clone()
+                        udf.series['indices'] = clone
+                    }
+                    dataframesUser.push(udf)
+
+                    const detects: ReturnTypes = attributeDetector(df)
+                    // Fill the udf
+                    detects.forEach((detect: ReturnType) => {
+                        const name = detect.name
+                        const nb = detect.end - detect.start + 1
+                        const S: Serie[] = []
+
+                        for (let i = detect.start; i <= detect.end; ++i) {
+                            S.push(df.series[`${name}${i}`])
+                        }
+
+                        const weightedSerie = weightedSum(S, new Array(nb).fill(1))
+                        udf.series[name] = weightedSerie
+                        //console.log(name, nb, weightedSerie)
+                    })
+
+                    allDetects.push(detects)
+
+                    const mng = new Manager(udf, {
+                        decomposers: [
+                            new PositionDecomposer,
+                            new ComponentDecomposer,
+                            new EigenValuesDecomposer,
+                        ]
+                    })
+                    return mng
+                });
 
                 if (scene) {
-                    //if (!(file.isoContour && file.isoContour === true)) {
-                        meshes.forEach(mesh => scene.add(mesh));
-                    //}
+                    meshes.forEach(mesh => scene.add(mesh));
                 }
 
-                loadedFiles.push({ file, dataframes, meshes, managers });
+                loadedFiles.push({
+                    detects: allDetects,
+                    file,
+                    dataframes,
+                    dataframesUser,
+                    meshes,
+                    managers
+                });
             } catch (error) {
                 console.error(`Failed to load ${file.path}:`, error);
-                loadedFiles.push({ file, dataframes: [], meshes: [], managers: [] });
+                loadedFiles.push({
+                    detects: [],
+                    file,
+                    dataframes: [],
+                    dataframesUser: [],
+                    meshes: [],
+                    managers: []
+                });
             }
         }
 
@@ -402,113 +443,3 @@ export class ModelLoader {
 
 
 
-// Base path for models - to be adjusted based vite.config.ts base setting
-const BASE_PATH = '/arch-platform';
-
-/**
- * Predefined model configurations
- */
-export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
-    Galapagos: {
-        name: 'Galapagos',
-        files: [
-            {
-                path: `${BASE_PATH}/models/Galapagos/Galapagos_obs.ts`,
-                type: 'TS',
-                name: 'Topography',
-                color: 0x4ecdc4,
-                isoContour: true,
-                geologicalType: 'Grid'
-            },
-            {
-                path: `${BASE_PATH}/models/Galapagos/all_Galapagos_magma_chambers.ts`,
-                type: 'TS',
-                name: 'Magma chambers',
-                color: 0x666666,
-                isoContour: false,
-                geologicalType: 'Discontinuity'
-            }
-        ]
-    },
-    NashPoint: {
-        name: 'NashPoint',
-        files: [
-            {
-                path: `${BASE_PATH}/models/NashPoint/2D_grid.ts`,
-                type: 'TS',
-                name: '2D Grid',
-                color: 0x95a5a6,
-                isoContour: true,
-                geologicalType: 'Grid',
-                visible: true
-            },
-            {
-                path: `${BASE_PATH}/models/NashPoint/NashPoint_faults.ts`,
-                type: 'TS', name: 'Faults',
-                color: 0x8888ff,
-                isoContour: false,
-                geologicalType: 'Discontinuity'
-            },
-            {
-                path: `${BASE_PATH}/models/NashPoint/all_joints_3D.ts`,
-                type: 'TS',
-                name: 'Joints 3D',
-                color: 0xff8888,
-                isoContour: false,
-                geologicalType: 'Unknown',
-                visible: true
-            },
-            {
-                path: `${BASE_PATH}/models/NashPoint/all_joints.pl`,
-                type: 'PL',
-                name: 'Joints Lines',
-                color: 0xffffff,
-                isoContour: false,
-                geologicalType: 'Unknown',
-                visible: true
-            }
-        ]
-    },
-    Tet: {
-        name: 'Tet',
-        files: [
-            {
-                path: `${BASE_PATH}/models/Tet/mnt.ts`,
-                type: 'TS',
-                name: 'Topography',
-                color: 0x4ecdc4,
-                isoContour: true,
-                geologicalType: 'Grid'
-            },
-            {
-                path: `${BASE_PATH}/models/Tet/faults.ts`,
-                type: 'TS',
-                name: 'Faults',
-                color: 0x8888FF,
-                isoContour: false,
-                geologicalType: 'Discontinuity'
-            }
-        ]
-    },
-    Matelles: {
-        name: 'Matelles',
-        files: [
-            {
-                path: `${BASE_PATH}/models/Matelles/grid.ts`,
-                type: 'TS',
-                name: 'Topography',
-                color: 0x4ecdc4,
-                isoContour: true,
-                geologicalType: 'Grid'
-            },
-            {
-                path: `${BASE_PATH}/models/Matelles/faults_friction.ts`,
-                type: 'TS',
-                name: 'Faults',
-                color: 0x8888FF,
-                isoContour: false,
-                geologicalType: 'Discontinuity'
-            }
-        ]
-    }
-};

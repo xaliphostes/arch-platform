@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useScene } from '../contexts/SceneContext'
-import { ModelLoader, PREDEFINED_MODELS, getAttributeNames, getAttributeSerie } from '../utils/ModelLoader'
+import { ModelLoader, getAttributeNames, getAttributeSerie } from '../utils/ModelLoader'
 
 import {
     BufferGeometry,
@@ -15,6 +15,7 @@ import {
 // import CameraControls from 'camera-controls'
 import { createComplexGradient } from '../keplerlit/FixedImageBackground'
 import { TrackballControls } from 'three/examples/jsm/Addons.js'
+import { PREDEFINED_MODELS } from '../models/predefinedModels'
 
 export const ThreeScene = () => {
     const mountRef = useRef<HTMLDivElement>(null)
@@ -42,7 +43,9 @@ export const ThreeScene = () => {
         selectedObject,
         fileVisualizationStates,
         setFileVisualizationState,
-        visibilityStates
+        visibilityStates,
+        regenerationTrigger,
+        modelLoaderRef: contextModelLoaderRef
     } = useScene()
 
     const clock = new THREE.Clock()
@@ -115,6 +118,7 @@ export const ThreeScene = () => {
 
         // Initialize ModelLoader
         modelLoaderRef.current = new ModelLoader()
+        contextModelLoaderRef.current = modelLoaderRef.current
 
         const animate = () => {
             animationIdRef.current = requestAnimationFrame(animate)
@@ -254,7 +258,7 @@ export const ThreeScene = () => {
         if (loadedModelName) {
             generateIsoContours()
         }
-    }, [displayMode, numContours, colorTable, loadedModelName, attribute, selectedObject])
+    }, [displayMode, numContours, colorTable, loadedModelName, attribute, selectedObject, regenerationTrigger])
 
     // Apply per-file visibility to both original meshes and iso-contours
     useEffect(() => {
@@ -347,39 +351,38 @@ export const ThreeScene = () => {
 
         // If no files to process (selection doesn't support iso-contours),
         // restore all files to their saved states
-        if (filesToProcess.length === 0) {
-            // console.log('Selected object does not support iso-contouring, restoring saved states');
+        // if (filesToProcess.length === 0) {
+        //     // console.log('Selected object does not support iso-contouring, restoring saved states');
 
-            // Restore each file to its saved visualization state
-            loadedModel.files.forEach(fileData => {
-                const savedState = fileVisualizationStates.get(fileData.file.path);
+        //     // Restore each file to its saved visualization state
+        //     loadedModel.files.forEach(fileData => {
+        //         const savedState = fileVisualizationStates.get(fileData.file.path);
 
-                if (savedState === 'iso' && fileData.file.isoContour) {
-                    // This file should show iso-contours, keep them visible
-                    const filledMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_filled`);
-                    const linesMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_lines`);
+        //         if (savedState === 'iso' && fileData.file.isoContour) {
+        //             // This file should show iso-contours, keep them visible
+        //             const filledMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_filled`);
+        //             const linesMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_lines`);
 
-                    if (filledMesh || linesMesh) {
-                        // Iso-contours exist, hide original
-                        fileData.meshes.forEach(mesh => mesh.visible = false);
-                    } else {
-                        // Iso-contours should exist but don't, regenerate them
-                        // (This will be handled by the regeneration logic below)
-                    }
-                } else {
-                    // Show original mesh
-                    fileData.meshes.forEach(mesh => {
-                        mesh.visible = fileData.file.visible !== false;
-                    });
-                }
-            });
+        //             if (filledMesh || linesMesh) {
+        //                 // Iso-contours exist, hide original
+        //                 fileData.meshes.forEach(mesh => mesh.visible = false);
+        //             } else {
+        //                 // Iso-contours should exist but don't, regenerate them
+        //                 // (This will be handled by the regeneration logic below)
+        //             }
+        //         } else {
+        //             // Show original mesh
+        //             fileData.meshes.forEach(mesh => {
+        //                 mesh.visible = fileData.file.visible !== false;
+        //             });
+        //         }
+        //     });
 
-            return;
-        }
+        //     return;
+        // }
+        // Store old meshes to remove later
+        const oldMeshesToRemove: Array<{ key: string; mesh: THREE.Mesh | THREE.LineSegments }> = [];
 
-        // console.log(`Generating iso-contours for ${filesToProcess.length} file(s)`);
-
-        // Clear iso-contours ONLY for files being processed
         filesToProcess.forEach(fileData => {
             const filledKey = `${fileData.file.name}_filled`;
             const linesKey = `${fileData.file.name}_lines`;
@@ -387,20 +390,37 @@ export const ThreeScene = () => {
             const filledMesh = isoContourMeshesRef.current.get(filledKey);
             const linesMesh = isoContourMeshesRef.current.get(linesKey);
 
+            // Instead of removing immediately, mark for removal
             if (filledMesh) {
-                sceneRef.current!.remove(filledMesh);
-                filledMesh.geometry.dispose();
-                (filledMesh.material as THREE.Material).dispose();
-                isoContourMeshesRef.current.delete(filledKey);
+                oldMeshesToRemove.push({ key: filledKey, mesh: filledMesh });
             }
-
             if (linesMesh) {
-                sceneRef.current!.remove(linesMesh);
-                linesMesh.geometry.dispose();
-                (linesMesh.material as THREE.Material).dispose();
-                isoContourMeshesRef.current.delete(linesKey);
+                oldMeshesToRemove.push({ key: linesKey, mesh: linesMesh });
             }
         });
+
+        // // Clear iso-contours ONLY for files being processed
+        // filesToProcess.forEach(fileData => {
+        //     const filledKey = `${fileData.file.name}_filled`;
+        //     const linesKey = `${fileData.file.name}_lines`;
+
+        //     const filledMesh = isoContourMeshesRef.current.get(filledKey);
+        //     const linesMesh = isoContourMeshesRef.current.get(linesKey);
+
+        //     if (filledMesh) {
+        //         sceneRef.current!.remove(filledMesh);
+        //         filledMesh.geometry.dispose();
+        //         (filledMesh.material as THREE.Material).dispose();
+        //         isoContourMeshesRef.current.delete(filledKey);
+        //     }
+
+        //     if (linesMesh) {
+        //         sceneRef.current!.remove(linesMesh);
+        //         linesMesh.geometry.dispose();
+        //         (linesMesh.material as THREE.Material).dispose();
+        //         isoContourMeshesRef.current.delete(linesKey);
+        //     }
+        // });
 
         // Process files that support iso-contours
         filesToProcess.forEach((fileData, fileIndex) => {
@@ -481,8 +501,6 @@ export const ThreeScene = () => {
                     isoList.push(minVal + (i / (numContours - 1)) * (maxVal - minVal))
                 }
 
-                // console.log(`Generating contours for ${file.name} using attribute "${attribute}": ${isoList.length} levels`)
-
                 // Generate filled contours
                 if (displayMode === 'filled' || displayMode === 'both') {
                     const result = createIsoContoursFilled(keplerGeometry, scalarField, isoList, {
@@ -514,9 +532,14 @@ export const ThreeScene = () => {
                         isoContourMeshesRef.current.set(`${file.name}_filled`, contourMesh)
 
                         // Hide the original meshes when showing iso-contours
-                        meshes.forEach(mesh => mesh.visible = false)
+                        // Only hide original meshes if they should be visible
+                        const shouldBeVisible = visibilityStates.has(file.path)
+                            ? !!visibilityStates.get(file.path)
+                            : (file.visible !== false);
 
-                        // console.log(`Created filled contours for ${file.name}`)
+                        if (shouldBeVisible) {
+                            meshes.forEach(mesh => mesh.visible = false);
+                        }
                     }
                 }
 
@@ -536,16 +559,33 @@ export const ThreeScene = () => {
                         const lines = new THREE.LineSegments(lineGeometry, lineMaterial)
                         lines.name = `${file.name}_isocontours_lines`
                         sceneRef.current!.add(lines)
+
                         isoContourMeshesRef.current.set(`${file.name}_lines`, lines)
 
                         // console.log(`Created line contours for ${file.name}`)
                     }
                 }
 
-                // Show original meshes if only displaying lines
-                if (displayMode === 'lines') {
-                    meshes.forEach(mesh => mesh.visible = true)
-                }
+                // Success! Now we can safely remove old meshes for this file
+                const filledKey = `${fileData.file.name}_filled`;
+                const linesKey = `${fileData.file.name}_lines`;
+
+                oldMeshesToRemove.forEach(({ key, mesh }) => {
+                    if (key === filledKey || key === linesKey) {
+                        sceneRef.current!.remove(mesh);
+                        mesh.geometry.dispose();
+                        (mesh.material as THREE.Material).dispose();
+                    }
+                });
+
+                // Only show original meshes if they should be visible
+                // const shouldBeVisible = visibilityStates.has(file.path)
+                //     ? !!visibilityStates.get(file.path)
+                //     : (file.visible !== false);
+
+                // if (shouldBeVisible) {
+                //     meshes.forEach(mesh => mesh.visible = true);
+                // }
 
                 // SAVE STATE: Mark this file as showing iso-contours
                 setFileVisualizationState(file.path, 'iso');
@@ -553,32 +593,34 @@ export const ThreeScene = () => {
             } catch (error) {
                 console.error(`Error generating contours for ${file.name}:`, error)
             }
+
+
         })
 
         // For files NOT being processed, restore their saved visualization state
-        loadedModel.files.forEach(fileData => {
-            const isBeingProcessed = filesToProcess.some(f => f.file.path === fileData.file.path);
+        // loadedModel.files.forEach(fileData => {
+        //     const isBeingProcessed = filesToProcess.some(f => f.file.path === fileData.file.path);
 
-            if (!isBeingProcessed) {
-                const savedState = fileVisualizationStates.get(fileData.file.path);
+        //     if (!isBeingProcessed) {
+        //         const savedState = fileVisualizationStates.get(fileData.file.path);
 
-                if (savedState === 'iso') {
-                    // Keep iso-contours visible, hide original
-                    const filledMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_filled`);
-                    const linesMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_lines`);
+        //         if (savedState === 'iso') {
+        //             // Keep iso-contours visible, hide original
+        //             const filledMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_filled`);
+        //             const linesMesh = isoContourMeshesRef.current.get(`${fileData.file.name}_lines`);
 
-                    if (filledMesh) filledMesh.visible = true;
-                    if (linesMesh) linesMesh.visible = true;
+        //             if (filledMesh) filledMesh.visible = true;
+        //             if (linesMesh) linesMesh.visible = true;
 
-                    fileData.meshes.forEach(mesh => mesh.visible = false);
-                } else {
-                    // Show original mesh (default state)
-                    fileData.meshes.forEach(mesh => {
-                        mesh.visible = fileData.file.visible !== false;
-                    });
-                }
-            }
-        });
+        //             fileData.meshes.forEach(mesh => mesh.visible = false);
+        //         } else {
+        //             // Show original mesh (default state)
+        //             fileData.meshes.forEach(mesh => {
+        //                 mesh.visible = fileData.file.visible !== false;
+        //             });
+        //         }
+        //     }
+        // });
     }
 
     return <div ref={mountRef} className="three-scene-container" />

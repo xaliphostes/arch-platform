@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { useScene } from '../contexts/SceneContext'
-import { PREDEFINED_MODELS } from '../utils/ModelLoader'
+import { PREDEFINED_MODELS } from '../models/predefinedModels'
 
 type FileEntry = {
   path: string

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useScene } from '../../contexts/SceneContext';
 import { CollapsibleSubPanel } from './CollapsibleSubPanel';
+import { doWeightedSum } from '../../utils/ModelLoader';
 
 interface TectonicStressPanelProps {
     isOpen: boolean;
@@ -14,13 +15,13 @@ interface TectonicStressPanelProps {
  */
 const getStressRegime = (r: number): { name: string; color: string } => {
     if (r >= 0 && r <= 1) {
-        return { name: 'Normal', color: '#0095ffff' }; // Green
+        return { name: 'Normal', color: '#0095ffff' };
     } else if (r > 1 && r <= 2) {
-        return { name: 'Strike-slip', color: '#00ff1aff' }; // Orange
+        return { name: 'Strike-slip', color: '#00ff1aff' };
     } else if (r > 2 && r <= 3) {
-        return { name: 'Reverse', color: '#ff1100ff' }; // Red
+        return { name: 'Reverse', color: '#ff1100ff' };
     }
-    return { name: 'Unknown', color: '#999999' }; // Gray fallback
+    return { name: 'Unknown', color: '#999999' };
 };
 
 export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
@@ -31,17 +32,65 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
         stressR,
         setStressR,
         stressTheta,
-        setStressTheta
+        setStressTheta,
+        modelLoaderRef,
+        loadedModelName,
+        triggerRegeneration
     } = useScene();
 
     // Calculate regime based on R value
     const regime = useMemo(() => getStressRegime(stressR), [stressR]);
 
+    /**
+     * Handle R parameter change
+     * Applies weighted sum to all loaded files and triggers regeneration
+     */
+    const handleRChange = (newR: number) => {
+        setStressR(newR);
+        
+        // Apply doWeightedSum to all files in the loaded model
+        if (modelLoaderRef.current && loadedModelName) {
+            const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
+            
+            if (loadedModel) {
+                loadedModel.files.forEach(fileData => {
+                    // Call doWeightedSum for each file
+                    doWeightedSum(fileData, stressTheta, stressR);
+                });
+                
+                // Trigger regeneration of iso-contours and view
+                triggerRegeneration();
+            }
+        }
+    };
+
+    /**
+     * Handle Theta parameter change
+     * Similar to R parameter handling
+     */
+    const handleThetaChange = (newTheta: number) => {
+        setStressTheta(newTheta);
+        
+        // Apply doWeightedSum to all files in the loaded model
+        if (modelLoaderRef.current && loadedModelName) {
+            const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
+            
+            if (loadedModel) {
+                loadedModel.files.forEach(fileData => {
+                    doWeightedSum(fileData, stressTheta, stressR);
+                });
+                
+                // Trigger regeneration
+                triggerRegeneration();
+            }
+        }
+    };
+
     return (
         <CollapsibleSubPanel title="Tectonic Stress" isOpen={isOpen} onToggle={onToggle}>
 
             {/* Regime Display */}
-            <div >
+            <div>
                 <span style={{ fontSize: '12px', color: '#aaa' }}>Regime: </span>
                 <span style={{
                     fontSize: '13px',
@@ -62,7 +111,7 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
                         max="3"
                         step="0.1"
                         value={stressR}
-                        onChange={(e) => setStressR(Number(e.target.value))}
+                        onChange={(e) => handleRChange(Number(e.target.value))}
                         style={{ flex: 1 }}
                     />
                     <input
@@ -71,7 +120,7 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
                         max="3"
                         step="0.1"
                         value={stressR}
-                        onChange={(e) => setStressR(Number(e.target.value))}
+                        onChange={(e) => handleRChange(Number(e.target.value))}
                         style={{ width: '70px' }}
                     />
                 </div>
@@ -87,7 +136,7 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
                         max="180"
                         step="1"
                         value={stressTheta}
-                        onChange={(e) => setStressTheta(Number(e.target.value))}
+                        onChange={(e) => handleThetaChange(Number(e.target.value))}
                         style={{ flex: 1 }}
                     />
                     <input
@@ -96,13 +145,13 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
                         max="180"
                         step="1"
                         value={stressTheta}
-                        onChange={(e) => setStressTheta(Number(e.target.value))}
+                        onChange={(e) => handleThetaChange(Number(e.target.value))}
                         style={{ width: '70px' }}
                     />
                 </div>
             </div>
 
-            {/* Optional: Visual indicator on the slider */}
+            {/* Visual indicator on the slider */}
             <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -133,10 +182,35 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
         stressR,
         setStressR,
         stressTheta,
-        setStressTheta
+        setStressTheta,
+        modelLoaderRef,
+        loadedModelName,
+        triggerRegeneration
     } = useScene();
 
     const regime = useMemo(() => getStressRegime(stressR), [stressR]);
+
+    const handleRChange = (newR: number) => {
+        setStressR(newR);
+        if (modelLoaderRef.current && loadedModelName) {
+            const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
+            if (loadedModel) {
+                loadedModel.files.forEach(fileData => doWeightedSum(fileData, stressTheta, stressR));
+                triggerRegeneration();
+            }
+        }
+    };
+
+    const handleThetaChange = (newTheta: number) => {
+        setStressTheta(newTheta);
+        if (modelLoaderRef.current && loadedModelName) {
+            const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
+            if (loadedModel) {
+                loadedModel.files.forEach(fileData => doWeightedSum(fileData, stressTheta, stressR));
+                triggerRegeneration();
+            }
+        }
+    };
 
     return (
         <CollapsibleSubPanel title="Tectonic Stress" isOpen={isOpen} onToggle={onToggle}>
@@ -164,7 +238,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
                         max="3"
                         step="0.1"
                         value={stressR}
-                        onChange={(e) => setStressR(Number(e.target.value))}
+                        onChange={(e) => handleRChange(Number(e.target.value))}
                         style={{ flex: 1 }}
                     />
                     <input
@@ -173,7 +247,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
                         max="3"
                         step="0.1"
                         value={stressR}
-                        onChange={(e) => setStressR(Number(e.target.value))}
+                        onChange={(e) => handleRChange(Number(e.target.value))}
                         style={{ width: '70px' }}
                     />
                 </div>
@@ -188,7 +262,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
                         max="180"
                         step="1"
                         value={stressTheta}
-                        onChange={(e) => setStressTheta(Number(e.target.value))}
+                        onChange={(e) => handleThetaChange(Number(e.target.value))}
                         style={{ flex: 1 }}
                     />
                     <input
@@ -197,7 +271,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
                         max="180"
                         step="1"
                         value={stressTheta}
-                        onChange={(e) => setStressTheta(Number(e.target.value))}
+                        onChange={(e) => handleThetaChange(Number(e.target.value))}
                         style={{ width: '70px' }}
                     />
                 </div>
