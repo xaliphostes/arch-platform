@@ -47,17 +47,17 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
      */
     const handleRChange = (newR: number) => {
         setStressR(newR);
-        
+
         // Apply doWeightedSum to all files in the loaded model
         if (modelLoaderRef.current && loadedModelName) {
             const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
-            
+
             if (loadedModel) {
                 loadedModel.files.forEach(fileData => {
                     // Call doWeightedSum for each file
                     doWeightedSum(fileData, stressTheta, stressR);
                 });
-                
+
                 // Trigger regeneration of iso-contours and view
                 triggerRegeneration();
             }
@@ -70,16 +70,16 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
      */
     const handleThetaChange = (newTheta: number) => {
         setStressTheta(newTheta);
-        
+
         // Apply doWeightedSum to all files in the loaded model
         if (modelLoaderRef.current && loadedModelName) {
             const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
-            
+
             if (loadedModel) {
                 loadedModel.files.forEach(fileData => {
                     doWeightedSum(fileData, stressTheta, stressR);
                 });
-                
+
                 // Trigger regeneration
                 triggerRegeneration();
             }
@@ -149,21 +149,6 @@ export const TectonicStressPanel: React.FC<TectonicStressPanelProps> = ({
                         style={{ width: '70px' }}
                     />
                 </div>
-            </div>
-
-            {/* Visual indicator on the slider */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '10px',
-                color: '#666',
-                marginTop: '8px',
-                paddingLeft: '8px',
-                paddingRight: '8px'
-            }}>
-                <span style={{ color: '#4CAF50' }}>Normal (0-1)</span>
-                <span style={{ color: '#FF9800' }}>Strike-slip (1-2)</span>
-                <span style={{ color: '#F44336' }}>Reverse (2-3)</span>
             </div>
 
         </CollapsibleSubPanel>

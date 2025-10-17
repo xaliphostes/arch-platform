@@ -8,3 +8,5 @@ export * from './attributes'
 export * from './BaseOverlay'
 export * from './ColorScale'
 export * from './Compass2D'
+
+export * from "./streamlines"

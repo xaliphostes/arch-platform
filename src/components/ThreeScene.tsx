@@ -16,11 +16,13 @@ import {
 import { createComplexGradient } from '../keplerlit/FixedImageBackground'
 import { TrackballControls } from 'three/examples/jsm/Addons.js'
 import { PREDEFINED_MODELS } from '../models/predefinedModels'
+import { ViewHelper2 } from '../keplerlit/ViewHelper2'
 
 export const ThreeScene = () => {
     const mountRef = useRef<HTMLDivElement>(null)
     const sceneRef = useRef<THREE.Scene | null>(null)
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+    const helperRef = useRef<ViewHelper2 | null>(null)
     const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
     const controlsRef = useRef<TrackballControls | null>(null)
     const animationIdRef = useRef<number | null>(null)
@@ -98,6 +100,10 @@ export const ThreeScene = () => {
         // controls.applyCameraUp()
         controlsRef.current = controls
 
+        const helper = new ViewHelper2(camera, renderer)
+        helper.setControls(controls)
+        helperRef.current = helper
+
         // Background
         const background = createComplexGradient(scene, 'grayscale')
 
@@ -128,38 +134,46 @@ export const ThreeScene = () => {
             const updated = controls.update(delta)
 
             renderer.render(scene, camera)
+            helperRef.current?.render()
 
             // Render ColorScale in animation loop
-            if (colorScaleRef.current) {
-                colorScaleRef.current.render()
-            }
+            colorScaleRef.current?.render()
         }
 
         animate()
 
         const handleResize = () => {
-            if (!mountRef.current || !cameraRef.current || !rendererRef.current) return
+            if (!mountRef.current || !cameraRef.current || !rendererRef.current) return;
+            const width = mountRef.current.clientWidth;
+            const height = mountRef.current.clientHeight;
 
-            const width = mountRef.current.clientWidth
-            const height = mountRef.current.clientHeight
+            cameraRef.current.aspect = width / height;
+            cameraRef.current.updateProjectionMatrix();
+            rendererRef.current.setSize(width, height);
 
-            cameraRef.current.aspect = width / height
-            cameraRef.current.updateProjectionMatrix()
-            rendererRef.current.setSize(width, height)
+            // keep helper/canvas aligned
+            helperRef.current?.update();
+            helperRef.current?.updateOrientation();
 
-            // Update ColorScale position on resize
             if (colorScaleRef.current) {
-                colorScaleRef.current.resize(width, height)
-                const x = width - 100
-                const y = 50
-                colorScaleRef.current.updatePosition(x, y)
-                colorScaleRef.current.updateSize(30, 200)
+                colorScaleRef.current.resize(width, height);
+                const x = width - 100;
+                const y = 50;
+                colorScaleRef.current.updatePosition(x, y);
+                colorScaleRef.current.updateSize(30, 200);
             }
         }
+        handleResize()
+
         window.addEventListener('resize', handleResize)
+
+        // NEW: observe container size changes (panels opening/closing)
+        // const ro = new ResizeObserver(() => handleResize());
+        // ro.observe(mountRef.current);
 
         return () => {
             window.removeEventListener('resize', handleResize)
+            // ro.disconnect();
             if (animationIdRef.current) {
                 cancelAnimationFrame(animationIdRef.current)
             }
