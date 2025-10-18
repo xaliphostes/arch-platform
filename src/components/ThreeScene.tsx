@@ -17,6 +17,7 @@ import { createComplexGradient } from '../keplerlit/FixedImageBackground'
 import { TrackballControls } from 'three/examples/jsm/Addons.js'
 import { PREDEFINED_MODELS } from '../models/predefinedModels'
 import { ViewHelper2 } from '../keplerlit/ViewHelper2'
+import { BoundingBoxAxesTroika } from '../keplerlit/BoundingBoxAxesTroika'
 
 export const ThreeScene = () => {
     const mountRef = useRef<HTMLDivElement>(null)
@@ -28,6 +29,7 @@ export const ThreeScene = () => {
     const animationIdRef = useRef<number | null>(null)
     const colorScaleRef = useRef<any | null>(null)
     const modelLoaderRef = useRef<ModelLoader | null>(null)
+    const bboxHelperRef = useRef<BoundingBoxAxesTroika | null>(null)
 
     // References for iso-contour meshes (separate from model meshes)
     const isoContourMeshesRef = useRef<Map<string, THREE.Mesh | THREE.LineSegments>>(new Map())
@@ -84,12 +86,17 @@ export const ThreeScene = () => {
         mountRef.current.appendChild(renderer.domElement)
         rendererRef.current = renderer
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.99)
-        scene.add(ambientLight)
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x202020, 1.0);
+        scene.add(hemi);
+        const dir = new THREE.DirectionalLight(0xffffff, 2);
+        dir.position.set(3, 5, 2);
+        scene.add(dir);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-        directionalLight.position.set(10, 10, 10)
-        scene.add(directionalLight)
+        // const ambientLight = new THREE.AmbientLight(0xffffff, 0.99)
+        // scene.add(ambientLight)
+        // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
+        // directionalLight.position.set(10, 10, 10)
+        // scene.add(directionalLight)
 
         // Setup the controls
         // const controls = new CameraControls(camera, renderer.domElement)
@@ -122,6 +129,17 @@ export const ThreeScene = () => {
             autoRender: false
         })
 
+        // Bbox around the model
+        const bboxHelper = new BoundingBoxAxesTroika(scene, {
+            origin: 'min',              // start at min corner
+            billboardLabels: true,      // face labels toward the camera
+            addAxisEndLabels: true,
+            tickTarget: 5,
+            fontSize: 0.03
+        });
+        bboxHelperRef.current = bboxHelper
+        scene.add(bboxHelper);
+
         // Initialize ModelLoader
         modelLoaderRef.current = new ModelLoader()
         contextModelLoaderRef.current = modelLoaderRef.current
@@ -129,9 +147,11 @@ export const ThreeScene = () => {
         const animate = () => {
             animationIdRef.current = requestAnimationFrame(animate)
 
-            const delta = clock.getDelta()
-            const elapsed = clock.getElapsedTime()
-            const updated = controls.update(delta)
+            // const delta = clock.getDelta()
+            // const elapsed = clock.getElapsedTime()
+            const updated = controls.update()
+
+            helper.update(); // keeps box in sync + billboarding
 
             renderer.render(scene, camera)
             helperRef.current?.render()
@@ -256,6 +276,7 @@ export const ThreeScene = () => {
 
                 // Generate iso-contours for files marked with isoContour: true
                 generateIsoContours()
+                bboxHelperRef.current?.setTarget(sceneRef.current)
 
             } catch (error) {
                 console.error(`Failed to load model ${config.name}:`, error)

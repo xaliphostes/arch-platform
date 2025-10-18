@@ -106,7 +106,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
 
     return (
         <CollapsibleSubPanel title="Iso-Contours" isOpen={isOpen} onToggle={onToggle}>
-            {/* NEW: Master enable/disable for current selection */}
+
             <div className="control-group horizontal" style={{ marginBottom: 8 }}>
                 <label>Enable iso-contours</label>
                 <input
@@ -148,7 +148,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
                     <input
                         type="range"
                         min="3"
-                        max="30"
+                        max="100"
                         value={numContours}
                         onChange={(e) => setNumContours(Number(e.target.value))}
                         style={{ flex: 1 }}
@@ -156,7 +156,7 @@ export const IsoContoursPanel: React.FC<IsoContoursPanelProps> = ({
                     <input
                         type="number"
                         min="3"
-                        max="30"
+                        max="100"
                         value={numContours}
                         onChange={(e) => setNumContours(Number(e.target.value))}
                         style={{ width: '60px' }}

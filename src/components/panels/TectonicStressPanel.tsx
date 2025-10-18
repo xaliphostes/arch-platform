@@ -203,7 +203,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
             {/* R Parameter with inline Regime display */}
             <div className="control-group horizontal">
                 <label>
-                    R: {stressR.toFixed(2)}
+                    R: {stressR.toFixed(3)}
                     <span style={{
                         marginLeft: '8px',
                         padding: '2px 6px',
@@ -221,7 +221,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
                         type="range"
                         min="0"
                         max="3"
-                        step="0.1"
+                        step="0.01"
                         value={stressR}
                         onChange={(e) => handleRChange(Number(e.target.value))}
                         style={{ flex: 1 }}
@@ -230,7 +230,7 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
                         type="number"
                         min="0"
                         max="3"
-                        step="0.1"
+                        step="0.01"
                         value={stressR}
                         onChange={(e) => handleRChange(Number(e.target.value))}
                         style={{ width: '70px' }}
