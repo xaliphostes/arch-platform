@@ -8,8 +8,6 @@ import { PositionDecomposer } from '@youwol/math';
 import { ComponentDecomposer } from '@youwol/math';
 import { EigenValuesDecomposer } from '@youwol/math';
 import { attributeDetector } from '@youwol/geophysics';
-import { append } from '@youwol/dataframe';
-import { insertSerie } from '@youwol/dataframe';
 import { ReturnType, ReturnTypes } from './attributeDetector';
 import { DecodedGOCAD, LoadedModel, ModelConfig, ModelFile } from './types';
 import { simpleAndersonMapping } from './mapping';

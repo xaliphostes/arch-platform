@@ -44,13 +44,20 @@ export const simpleAndersonMapping: alphaMapping = (alpha: Alpha): Alpha => {
     const c2 = c ** 2
     const s2 = s ** 2
 
+    let sol: Alpha | undefined = undefined
+
     if (R <= 1) {
-        return [-c2 + (R - 1) * s2, R * c * s, -s2 + (R - 1) * c2]
+        sol = [-c2 + (R - 1) * s2, R * c * s, -s2 + (R - 1) * c2]
     }
-    if (R <= 2) {
-        return [-R * c2 + (1 - R) * s2, c * s, -R * s2 + (1 - R) * c2]
+    else if (R <= 2) {
+        sol = [-R * c2 + (1 - R) * s2, c * s, -R * s2 + (1 - R) * c2]
     }
-    return [R * c2 + s2, (1 - R) * c * s, R * s2 + c2]
+    else {
+        sol = [R * c2 + s2, (1 - R) * c * s, R * s2 + c2]
+    }
+
+    // console.log(sol.map(a=> a.toFixed(3)))
+    return sol
 }
 
 /**
