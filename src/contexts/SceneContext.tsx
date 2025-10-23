@@ -40,6 +40,9 @@ interface SceneContextType {
 
     // ModelLoader reference
     modelLoaderRef: React.MutableRefObject<ModelLoader | null>;
+
+    modelReadyTick: number;
+    bumpModelReady: () => void,
 }
 
 const SceneContext = createContext<SceneContextType | undefined>(undefined);
@@ -66,6 +69,8 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // Add these new state and ref:
     const [regenerationTrigger, setRegenerationTrigger] = useState<number>(0);
     const modelLoaderRef = useRef<ModelLoader | null>(null);
+
+    const [modelReadyTick, setModelReadyTick] = useState(0);
 
     const setFileVisualizationState = (filePath: string, state: 'original' | 'iso') => {
         setFileVisualizationStates(prev => {
@@ -127,7 +132,10 @@ export const SceneProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
                 regenerationTrigger,
                 triggerRegeneration,
-                modelLoaderRef
+                modelLoaderRef,
+
+                modelReadyTick,
+                bumpModelReady: () => setModelReadyTick(t => t + 1),
             }}
         >
             {children}

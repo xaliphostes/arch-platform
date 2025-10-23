@@ -11,7 +11,7 @@ interface CollapsiblePanelWrapperProps {
 export const CollapsiblePanelWrapper: React.FC<CollapsiblePanelWrapperProps> = ({
     children,
     side,
-    defaultWidth = 250,
+    defaultWidth = 300,
     onToggle
 }) => {
     const [isCollapsed, setIsCollapsed] = useState(false)

@@ -49,7 +49,9 @@ export const ThreeScene = () => {
         setFileVisualizationState,
         visibilityStates,
         regenerationTrigger,
-        modelLoaderRef: contextModelLoaderRef
+        modelLoaderRef: contextModelLoaderRef,
+        // add from context:
+        bumpModelReady,
     } = useScene()
 
     const clock = new THREE.Clock()
@@ -255,17 +257,17 @@ export const ThreeScene = () => {
                     // console.log('Extracted attribute names:', attributeNames)
 
                     // Always include 'z' as a fallback
-                    const availableAttrs = attributeNames.length > 0 ? ['z', ...attributeNames] : ['Ux']
+                    const availableAttrs = attributeNames.length > 0 ? ['z', ...attributeNames] : ['z']
                     setAvailableAttributes(availableAttrs)
 
                     // Set default attribute to 'z'
-                    setAttribute('Ux')
+                    setAttribute('z')
 
                     // console.log('Available attributes set to:', availableAttrs)
                 } else {
                     // console.log('No ISO contour file found in model')
-                    setAvailableAttributes(['Ux'])
-                    setAttribute('Ux')
+                    setAvailableAttributes(['z'])
+                    setAttribute('z')
                 }
 
                 if (cameraRef.current) {
@@ -278,6 +280,7 @@ export const ThreeScene = () => {
                 generateIsoContours()
                 bboxHelperRef.current?.setTarget(sceneRef.current)
 
+                bumpModelReady();
             } catch (error) {
                 console.error(`Failed to load model ${config.name}:`, error)
             }
@@ -298,7 +301,6 @@ export const ThreeScene = () => {
     // Apply per-file visibility to both original meshes and iso-contours
     // Updated visibility logic for per-mesh iso-contours
     // Replace the visibility useEffect with this version:
-
     useEffect(() => {
         if (!sceneRef.current || !modelLoaderRef.current || !loadedModelName) return
         const loadedModel = modelLoaderRef.current.getModel(loadedModelName)
@@ -372,8 +374,8 @@ export const ThreeScene = () => {
         // Determine which files to process based on selection
         let filesToProcess = loadedModel.files.filter(f => f.file.isoContour === true);
 
-        /*
         // If a specific object is selected, filter to only that object
+        /*
         if (selectedObject && selectedObject !== loadedModelName) {
             const parts = selectedObject.split(':');
 
@@ -402,6 +404,31 @@ export const ThreeScene = () => {
 
             if (meshes.length === 0 || dataframes.length === 0) {
                 console.warn(`Skipping ${file.name}: missing meshes or dataframes`);
+                return;
+            }
+
+            const path = file.path;
+
+            // Respect current checkbox visibility
+            const defaultVisible = file.visible !== false;
+            const shouldShow = visibilityStates.has(path) ? !!visibilityStates.get(path) : defaultVisible;
+
+            // Respect current visualization state (iso vs original)
+            const vizState = fileVisualizationStates.get(path); // 'iso' | 'original' | undefined
+            const showIso = vizState === 'iso';
+
+            // If the layer is hidden or not in iso mode, just remove any old iso meshes and skip
+            meshes.forEach((_, meshIndex) => {
+                const filledKey = `${file.name}_mesh${meshIndex}_filled`;
+                const linesKey = `${file.name}_mesh${meshIndex}_lines`;
+                const oldFilled = isoContourMeshesRef.current.get(filledKey);
+                const oldLines = isoContourMeshesRef.current.get(linesKey);
+                if (oldFilled) { sceneRef.current!.remove(oldFilled); oldFilled.geometry.dispose(); (oldFilled.material as THREE.Material).dispose(); isoContourMeshesRef.current.delete(filledKey); }
+                if (oldLines) { sceneRef.current!.remove(oldLines); oldLines.geometry.dispose(); (oldLines.material as THREE.Material).dispose(); isoContourMeshesRef.current.delete(linesKey); }
+            });
+
+            if (!shouldShow || !showIso) {
+                // Do NOT create new iso meshes for hidden/non-iso layers
                 return;
             }
 
@@ -504,35 +531,48 @@ export const ThreeScene = () => {
                         })
 
                         if (result) {
-                            const meshGeometry = new THREE.BufferGeometry()
-                            meshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.position, 3))
-                            meshGeometry.setIndex(new THREE.Uint32BufferAttribute(result.index, 1))
+                            // Validate result positions for NaN values
+                            let hasNaN = false;
+                            for (let i = 0; i < result.position.length; i++) {
+                                if (!isFinite(result.position[i])) {
+                                    hasNaN = true;
+                                    break;
+                                }
+                            }
 
-                            const colors = new Float32Array(result.color)
-                            meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-                            meshGeometry.computeVertexNormals()
+                            if (hasNaN) {
+                                console.warn(`Skipping iso-contour mesh for ${file.name} mesh ${meshIndex}: contains NaN values`);
+                            } else {
+                                const meshGeometry = new THREE.BufferGeometry()
+                                meshGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.position, 3))
+                                meshGeometry.setIndex(new THREE.Uint32BufferAttribute(result.index, 1))
 
-                            const material = new THREE.MeshPhongMaterial({
-                                vertexColors: true,
-                                side: THREE.DoubleSide,
-                                wireframe: false,
-                                flatShading: false,
-                                polygonOffset: true,
-                                polygonOffsetFactor: 0.5
-                            })
+                                const colors = new Float32Array(result.color)
+                                meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+                                meshGeometry.computeVertexNormals()
 
-                            const contourMesh = new THREE.Mesh(meshGeometry, material)
-                            contourMesh.name = `${file.name}_mesh${meshIndex}_isocontours_filled`
-                            sceneRef.current!.add(contourMesh)
-                            isoContourMeshesRef.current.set(filledKey, contourMesh)
+                                const material = new THREE.MeshPhongMaterial({
+                                    vertexColors: true,
+                                    side: THREE.DoubleSide,
+                                    wireframe: false,
+                                    flatShading: false,
+                                    polygonOffset: true,
+                                    polygonOffsetFactor: 0.5
+                                })
 
-                            // Hide the original mesh when showing iso-contours
-                            const shouldBeVisible = visibilityStates.has(file.path)
-                                ? !!visibilityStates.get(file.path)
-                                : (file.visible !== false);
+                                const contourMesh = new THREE.Mesh(meshGeometry, material)
+                                contourMesh.name = `${file.name}_mesh${meshIndex}_isocontours_filled`
+                                sceneRef.current!.add(contourMesh)
+                                isoContourMeshesRef.current.set(filledKey, contourMesh)
 
-                            if (shouldBeVisible) {
-                                mesh.visible = false;
+                                // Hide the original mesh when showing iso-contours
+                                const shouldBeVisible = visibilityStates.has(file.path)
+                                    ? !!visibilityStates.get(file.path)
+                                    : (file.visible !== false);
+
+                                if (shouldBeVisible) {
+                                    mesh.visible = false;
+                                }
                             }
                         }
                     }
@@ -542,19 +582,32 @@ export const ThreeScene = () => {
                         const result = createIsoContourLines(keplerGeometry, scalarField, isoList, '#000000', colorTable)
 
                         if (result.positions.length > 0) {
-                            const lineGeometry = new THREE.BufferGeometry()
-                            lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3))
+                            // Validate positions for NaN values
+                            let hasNaN = false;
+                            for (let i = 0; i < result.positions.length; i++) {
+                                if (!isFinite(result.positions[i])) {
+                                    hasNaN = true;
+                                    break;
+                                }
+                            }
 
-                            const lineMaterial = new THREE.LineBasicMaterial({
-                                color: 0x000000,
-                                linewidth: 2
-                            })
+                            if (hasNaN) {
+                                console.warn(`Skipping iso-contour lines for ${file.name} mesh ${meshIndex}: contains NaN values`);
+                            } else {
+                                const lineGeometry = new THREE.BufferGeometry()
+                                lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(result.positions, 3))
 
-                            const lines = new THREE.LineSegments(lineGeometry, lineMaterial)
-                            lines.name = `${file.name}_mesh${meshIndex}_isocontours_lines`
-                            sceneRef.current!.add(lines)
+                                const lineMaterial = new THREE.LineBasicMaterial({
+                                    color: 0x000000,
+                                    linewidth: 2
+                                })
 
-                            isoContourMeshesRef.current.set(linesKey, lines)
+                                const lines = new THREE.LineSegments(lineGeometry, lineMaterial)
+                                lines.name = `${file.name}_mesh${meshIndex}_isocontours_lines`
+                                sceneRef.current!.add(lines)
+
+                                isoContourMeshesRef.current.set(linesKey, lines)
+                            }
                         }
                     }
 
@@ -563,8 +616,9 @@ export const ThreeScene = () => {
                 }
             });
 
-            // SAVE STATE: Mark this file as showing iso-contours (after processing all meshes)
-            setFileVisualizationState(file.path, 'iso');
+            // Note: We don't call setFileVisualizationState here as it causes infinite loops
+            // The state should be set by user interaction in the UI, not during regeneration
+
         });
     }
 

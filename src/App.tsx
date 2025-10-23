@@ -16,7 +16,7 @@ function App() {
 
                 <ThreeScene />
 
-                <CollapsiblePanelWrapper side="right" defaultWidth={300}>
+                <CollapsiblePanelWrapper side="right" defaultWidth={350}>
                     <RightPanel />
                 </CollapsiblePanelWrapper>
             </div>
