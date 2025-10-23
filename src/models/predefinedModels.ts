@@ -32,7 +32,7 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
         name: 'NashPoint',
         files: [
             {
-                path: `${BASE_PATH}/models/NashPoint/2D_grid.ts`,
+                path: `${BASE_PATH}/models/NashPoint/2D_grid_holes.ts`,
                 type: 'TS',
                 name: '2D Grid',
                 color: 0x95a5a6,
