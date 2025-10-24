@@ -1,6 +1,6 @@
 import { ModelConfig } from "../utils/types";
 
-// Base path for models - to be adjusted based vite.config.ts base setting
+// Base path for models - to be adjusted with vite.config.ts base setting
 const BASE_PATH = '/arch-platform';
 
 /**
@@ -32,7 +32,7 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
         name: 'NashPoint',
         files: [
             {
-                path: `${BASE_PATH}/models/NashPoint/2D_grid.ts`,
+                path: `${BASE_PATH}/models/NashPoint/2D_grid_holes.ts`,
                 type: 'TS',
                 name: '2D Grid',
                 color: 0x95a5a6,
@@ -44,7 +44,7 @@ export const PREDEFINED_MODELS: { [key: string]: ModelConfig } = {
                 path: `${BASE_PATH}/models/NashPoint/NashPoint_faults.ts`,
                 type: 'TS', name: 'Faults',
                 color: 0x8888ff,
-                isoContour: false,
+                isoContour: true,
                 geologicalType: 'Discontinuity'
             },
             {

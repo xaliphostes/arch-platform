@@ -180,7 +180,10 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
         if (modelLoaderRef.current && loadedModelName) {
             const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
             if (loadedModel) {
-                loadedModel.files.forEach(fileData => doWeightedSum(fileData, stressTheta, stressR));
+                loadedModel.files.forEach(fileData => {
+                    // use newR with current theta
+                    doWeightedSum(fileData, stressTheta, newR);
+                });
                 triggerRegeneration();
             }
         }
@@ -191,7 +194,10 @@ export const TectonicStressPanelCompact: React.FC<TectonicStressPanelProps> = ({
         if (modelLoaderRef.current && loadedModelName) {
             const loadedModel = modelLoaderRef.current.getModel(loadedModelName);
             if (loadedModel) {
-                loadedModel.files.forEach(fileData => doWeightedSum(fileData, stressTheta, stressR));
+                loadedModel.files.forEach(fileData => {
+                    // use newTheta with current R
+                    doWeightedSum(fileData, newTheta, stressR);
+                });
                 triggerRegeneration();
             }
         }

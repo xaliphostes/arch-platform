@@ -1,3 +1,5 @@
+import { deg2rad } from "@youwol/geophysics"
+
 export type Alpha = number[]
 
 export interface alphaMapping {
@@ -29,6 +31,11 @@ export interface alphaMapping {
  * `Maerten, F., Madden, E. H., Pollard, D. D., & Maerten, L. (2016). Incorporating fault mechanics into inversions of aftershock data for the regional remote stress, with application to the 1992 Landers, California earthquake. Tectonophysics, 674, 52-64.`
  */
 export const simpleAndersonMapping: alphaMapping = (alpha: Alpha): Alpha => {
+    if (alpha.length < 2) {
+        throw new Error(`argument alpha should be equal to 2:
+        alpha = [theta, R]. Got ${alpha}`)
+    }
+
     const theta = alpha[0]
     const R = alpha[1]
 
@@ -39,18 +46,43 @@ export const simpleAndersonMapping: alphaMapping = (alpha: Alpha): Alpha => {
         throw new Error('R must be in [0..3]')
     }
 
-    const c = Math.cos((theta * Math.PI) / 180)
-    const s = Math.sin((theta * Math.PI) / 180)
+    const c = Math.cos(deg2rad(theta))
+    const s = Math.sin(deg2rad(theta))
     const c2 = c ** 2
     const s2 = s ** 2
+    const sc = s * c
 
     if (R <= 1) {
-        return [-c2 + (R - 1) * s2, R * c * s, -s2 + (R - 1) * c2]
+        return [R * s2, -R * sc, R * c2, 1]
     }
-    if (R <= 2) {
-        return [-R * c2 + (1 - R) * s2, c * s, -R * s2 + (1 - R) * c2]
+    else if (R <= 2) {
+        return [s2, -sc, c2, (2 - R)]
     }
-    return [R * c2 + s2, (1 - R) * c * s, R * s2 + c2]
+    else {
+        return [c2 + (R - 2) * s2, (3 - R) * sc, s2 + (R - 2) * c2, 0]
+    }
+
+    // if (R <= 1) {
+    //     return [
+    //         -c2 + (R - 1) * s2,
+    //         R * c * s,
+    //         -s2 + (R - 1) * c2
+    //     ]
+    // }
+
+    // if (R <= 2) {
+    //     return [
+    //         -R * c2 + (1 - R) * s2,
+    //         c * s,
+    //         -R * s2 + (1 - R) * c2
+    //     ]
+    // }
+
+    // return [
+    //     R * c2 + s2,
+    //     (1 - R) * c * s,
+    //     R * s2 + c2
+    // ]
 }
 
 /**
