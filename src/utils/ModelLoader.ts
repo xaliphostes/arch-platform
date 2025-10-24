@@ -8,7 +8,7 @@ import { PositionDecomposer } from '@youwol/math';
 import { ComponentDecomposer } from '@youwol/math';
 import { EigenValuesDecomposer } from '@youwol/math';
 import { attributeDetector } from '@youwol/geophysics';
-import { ReturnType, ReturnTypes } from './attributeDetector';
+import { ReturnType, returnTypeDim, ReturnTypes } from './attributeDetector';
 import { DecodedGOCAD, LoadedModel, ModelConfig, ModelFile } from './types';
 import { simpleAndersonMapping } from './mapping';
 
@@ -60,13 +60,12 @@ export function getAttributeSerie(
 
 // Beurk du [0]
 export function doWeightedSum(loadedFile: LoadedModel['files'][0], theta: number, R: number) {
-    //console.log(theta, R)
     const alpha = simpleAndersonMapping([theta, R])
     loadedFile.detects.forEach((detects, i) => detects.forEach(detect => {
         const df = loadedFile.dataframes[i]
         const udf = loadedFile.dataframesUser[i]
         const name = detect.name
-        const nb = detect.end - detect.start + 1
+        const nb = returnTypeDim(detect)
         const S: Serie[] = []
 
         for (let i = detect.start; i <= detect.end; ++i) {
@@ -74,9 +73,8 @@ export function doWeightedSum(loadedFile: LoadedModel['files'][0], theta: number
         }
 
         const alpha_bis = new Array(nb).fill(1)
-
-        const weightedSerie = weightedSum(S, alpha.length == nb ? alpha : alpha_bis)
-        udf.series[name] = weightedSerie
+        
+        udf.series[name] = weightedSum(S, alpha.length == nb ? alpha : alpha_bis)
     }))
 }
 

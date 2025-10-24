@@ -53,13 +53,13 @@ export const simpleAndersonMapping: alphaMapping = (alpha: Alpha): Alpha => {
     const sc = s * c
 
     if (R <= 1) {
-        return [R * s2 - 1, -R * sc, R * c2 - 1]
+        return [R * s2, -R * sc, R * c2, 1]
     }
     else if (R <= 2) {
-        return [s2 - (2 - R), -sc, c2 - (2 - R)]
+        return [s2, -sc, c2, (2 - R)]
     }
     else {
-        return [c2 + (R - 2) * s2, (3 - R) * sc, s2 + (R - 2) * c2]
+        return [c2 + (R - 2) * s2, (3 - R) * sc, s2 + (R - 2) * c2, 0]
     }
 
     // if (R <= 1) {

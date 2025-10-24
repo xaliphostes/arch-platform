@@ -1,10 +1,17 @@
 import { DataFrame, getNameSeries } from '@youwol/dataframe'
 
+/**
+ * dim(Alpha) = end - start + 1
+ */
 export type ReturnType = {
     itemSize: number
     name: string
     start: number
     end: number
+}
+
+export function returnTypeDim(r: ReturnType): number {
+    return r.end - r.start + 1
 }
 
 export type ReturnTypes = ReturnType[]
